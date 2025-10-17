@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: nest_app
+    restart: always
+    ports:
+      - '${PORT}:3000'
+    # depends_on: db   # DB container removed, connect to local DB instead
+    env_file:
+      - .env
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+
+#  db:
+#    image: postgres:15
+#    container_name: postgres_db
+#    restart: always
+#    ports:
+#      - '5432:5432'
+#    env_file:
+#      - .env
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  # pgdata:   # not needed if DB container is removed

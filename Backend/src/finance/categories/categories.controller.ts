@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CategoriesService } from './categories.service';
@@ -31,15 +32,26 @@ export class CategoriesController {
     @Body() createCategoryDto: CreateCategoryDto,
     @GetUser() user: User,
   ): Promise<ApiResponse<Category>> {
-    const category = await this.categoriesService.create(
-      createCategoryDto,
-      user,
-    );
-    return {
-      success: true,
-      message: 'Category created successfully',
-      data: category,
-    };
+    try {
+      const category = await this.categoriesService.create(
+        createCategoryDto,
+        user,
+      );
+      return {
+        success: true,
+        message: 'Category created successfully',
+        data: category,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message:
+          error.code === '23505'
+            ? `Category with name "${createCategoryDto.name}" already exists.`
+            : error.message || 'Failed to create category',
+        data: null,
+      };
+    }
   }
 
   /** FIND ALL */
@@ -48,15 +60,23 @@ export class CategoriesController {
     @Query() filterDto: FilterCategoriesDto,
     @GetUser() user: User,
   ): Promise<ApiResponse<Category[]>> {
-    const categories = await this.categoriesService.findAll(
-      filterDto,
-      user?.id,
-    );
-    return {
-      success: true,
-      message: 'Categories fetched successfully',
-      data: categories,
-    };
+    try {
+      const categories = await this.categoriesService.findAll(
+        filterDto,
+        user?.id,
+      );
+      return {
+        success: true,
+        message: 'Categories fetched successfully',
+        data: categories,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch categories',
+        data: null,
+      };
+    }
   }
 
   /** FIND ONE */
@@ -64,12 +84,20 @@ export class CategoriesController {
   async findOne(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ApiResponse<Category>> {
-    const category = await this.categoriesService.findOne(id);
-    return {
-      success: true,
-      message: 'Category fetched successfully',
-      data: category,
-    };
+    try {
+      const category = await this.categoriesService.findOne(id);
+      return {
+        success: true,
+        message: 'Category fetched successfully',
+        data: category,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch category',
+        data: null,
+      };
+    }
   }
 
   /** UPDATE */
@@ -79,16 +107,27 @@ export class CategoriesController {
     @Body() updateCategoryDto: UpdateCategoryDto,
     @GetUser() user: User,
   ): Promise<ApiResponse<Category>> {
-    const category = await this.categoriesService.update(
-      id,
-      updateCategoryDto,
-      user.id,
-    );
-    return {
-      success: true,
-      message: 'Category updated successfully',
-      data: category,
-    };
+    try {
+      const category = await this.categoriesService.update(
+        id,
+        updateCategoryDto,
+        user.id,
+      );
+      return {
+        success: true,
+        message: 'Category updated successfully',
+        data: category,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message:
+          error.code === '23505'
+            ? `Category with name "${updateCategoryDto.name}" already exists.`
+            : error.message || 'Failed to update category',
+        data: null,
+      };
+    }
   }
 
   /** DELETE */
@@ -97,22 +136,38 @@ export class CategoriesController {
     @Param('id', ParseIntPipe) id: number,
     @GetUser() user: User,
   ): Promise<ApiResponse<null>> {
-    await this.categoriesService.remove(id, user.id);
-    return {
-      success: true,
-      message: 'Category deleted successfully',
-      data: null,
-    };
+    try {
+      await this.categoriesService.remove(id, user.id);
+      return {
+        success: true,
+        message: 'Category deleted successfully',
+        data: null,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to delete category',
+        data: null,
+      };
+    }
   }
 
   /** STATS */
   @Get('stats/all')
-  async getStats(@GetUser() user: User) {
-    const stats = await this.categoriesService.getStats(user?.id);
-    return {
-      success: true,
-      message: 'Category stats fetched successfully',
-      data: stats,
-    };
+  async getStats(@GetUser() user: User): Promise<ApiResponse<any>> {
+    try {
+      const stats = await this.categoriesService.getStats(user?.id);
+      return {
+        success: true,
+        message: 'Category stats fetched successfully',
+        data: stats,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch stats',
+        data: null,
+      };
+    }
   }
 }

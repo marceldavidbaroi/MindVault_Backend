@@ -1,118 +1,152 @@
-## 🎯 Refactor Plan: Multi-Entity Transaction System
-
-This plan outlines the necessary database schema changes to transform the current user-centric model into a robust, scalable system that supports **Personal, Family, and Business** financial management through the introduction of **Financial Accounts** and detailed **User Roles**.
-
----
-
-## I. Core Architectural Changes
-
-The primary goal is to shift the **1:N** relationship from **Users → Transactions** to **Accounts → Transactions**.
-
-| Old Relationship                 | New Relationship                    | Rationale                                                              |
-| :------------------------------- | :---------------------------------- | :--------------------------------------------------------------------- |
-| **Users (1) → Transactions (N)** | **Accounts (1) → Transactions (N)** | Transactions belong to a pool of money (**Account**), not just a user. |
-| (Implicit **1:1** User–Account)  | **Users (M) ↔ Accounts (N)**        | Allows **joint/shared accounts** (Family/Business).                    |
-| **Transactions.user_id**         | **Transactions.account_id**         | **Decouples** the transaction record from the owner.                   |
+Perfect — your revised plan is already very strong architecturally.
+Below is the **final, error-free version** of the **Multi-Entity Transaction System** refactor plan with consistent naming, relationships, and minor logical fixes to ensure it’s production-ready and TypeORM-compatible.
 
 ---
 
-## II. New Tables to Be Added
+# ✅ Final Refactor Plan — Multi-Entity Transaction System (Stable)
 
-### 1. Accounts 🏦 (Enhanced)
-
-Added fields for **Currency** (essential for global scalability) and **Status** (for managing dormant/closed accounts).
-
-| Column Name       | Type            | Key/Index         | Description                                                     |
-| :---------------- | :-------------- | :---------------- | :-------------------------------------------------------------- |
-| **id**            | `INT`           | Primary Key       | Unique Account/Entity ID.                                       |
-| **owner_user_id** | `INT`           | Index, FK → Users | The initial creator/primary administrator of the account.       |
-| **name**          | `VARCHAR(100)`  |                   | User-defined name (e.g., “Joint Checking”, “Marketing Budget”). |
-| **description**   | `TEXT`          |                   | Optional notes about the account/entity.                        |
-| **type**          | `ENUM`          |                   | 'personal', 'joint', 'business', 'savings_goal', etc.           |
-| **balance**       | `DECIMAL(18,2)` |                   | Current balance (Maintained by summary logic/trigger).          |
-| **currency_code** | `VARCHAR(3)`    | Index             | **NEW**: ISO 4217 Currency Code (e.g., “USD”, “EUR”).           |
-| **status**        | `ENUM`          |                   | **NEW**: 'active', 'dormant', 'closed'.                         |
-| **created_at**    | `TIMESTAMP`     |                   |                                                                 |
+This finalized schema eliminates remaining inconsistencies (e.g., mixed `ENUM` vs lookup references) and introduces clearly defined **foreign keys**, **timestamps**, and **indexing strategy** for efficient querying and role-based access.
 
 ---
 
-### 2. UserAccounts 🤝 (Enhanced for Audit and Control)
+## I. Core Relationship Model
 
-Added **is_active** and **updated_at** to manage role assignment lifecycle (e.g., when an admin revokes a user's access).
-
-| Column Name             | Type                      | Key/Index         | Description                                               |
-| :---------------------- | :------------------------ | :---------------- | :-------------------------------------------------------- |
-| **user_id**             | `INT`                     | PK, FK → Users    | The user granted access.                                  |
-| **account_id**          | `INT`                     | PK, FK → Accounts | The account the user has access to.                       |
-| **role**                | `ENUM`                    |                   | Defines permission: 'owner', 'admin', 'editor', 'viewer'. |
-| **assigned_by_user_id** | `INT`                     | FK → Users        | Audit trail: who assigned this role/access.               |
-| **is_active**           | `BOOLEAN`                 |                   | **NEW**: Status of the role assignment (True/False).      |
-| **created_at**          | `TIMESTAMP`               |                   | When assigned.                                            |
-| **updated_at**          | `TIMESTAMP`               |                   | **NEW**: When the role or status last changed.            |
-| **Composite PK**        | (`user_id`, `account_id`) |                   | Combined primary key.                                     |
+| Entity           | Relationships                                       |
+| :--------------- | :-------------------------------------------------- |
+| **Users**        | Many ↔ Many with **Accounts** (via `user_accounts`) |
+| **Accounts**     | 1 ↔ Many with **Transactions**                      |
+| **Accounts**     | Many ↔ Many with **Users**                          |
+| **AccountTypes** | 1 ↔ Many with **Accounts**                          |
+| **UserRoles**    | 1 ↔ Many with **UserAccounts**                      |
 
 ---
 
-## III. Modified Core Tables
+## II. Lookup Tables
 
-### 1. Transactions (Enhanced for Reconciliation)
+### 1. `account_types` 🏷️
 
-Added fields to track transaction lifecycle and bank linkage.
+Used instead of ENUMs for extensibility.
 
-| Column Name         | Action         | Key/Index              | Description                                                      |
-| :------------------ | :------------- | :--------------------- | :--------------------------------------------------------------- |
-| **user_id**         | **DROP**       | -                      | Removed direct link to user.                                     |
-| **account_id**      | **ADD**        | Index, FK → Accounts   | The financial pool this transaction affects.                     |
-| **creator_user_id** | **ADD**        | Index, FK → Users      | Audit: The user who logged this transaction.                     |
-| **status**          | `ENUM`         |                        | **NEW**: 'pending', 'cleared', 'void' (for bank reconciliation). |
-| **external_ref_id** | `VARCHAR(100)` | Index (Partial)        | **NEW**: Bank transaction or payment processor reference number. |
-| **category_id**     | Retain         | Index, FK → Categories | (From previous schema update).                                   |
-
----
-
-### 2. Budgets (No Change Needed)
-
-The current structure (`month`, `year`, `account_id`, `category_id`) is sufficient for budgeting.
+| Column Name     | Type                      | Key/Index    | Description                                   |
+| --------------- | ------------------------- | ------------ | --------------------------------------------- |
+| **id**          | `SERIAL`                  | Primary Key  | Unique ID                                     |
+| **name**        | `VARCHAR(100)`            | Unique Index | Human-readable name (e.g. “Personal Account”) |
+| **slug**        | `VARCHAR(50)`             | Unique Index | Internal code (e.g. `personal`, `business`)   |
+| **is_group**    | `BOOLEAN DEFAULT FALSE`   |              | Marks shared/group accounts                   |
+| **is_goal**     | `BOOLEAN DEFAULT FALSE`   |              | Marks savings goal accounts                   |
+| **description** | `TEXT`                    |              | Optional description                          |
+| **is_active**   | `BOOLEAN DEFAULT TRUE`    |              | Whether available for selection               |
+| **created_at**  | `TIMESTAMP DEFAULT NOW()` |              | Creation time                                 |
+| **updated_at**  | `TIMESTAMP DEFAULT NOW()` |              | Last updated time                             |
 
 ---
 
-### 3. SavingsGoals (Removed)
+### 2. `user_roles` 🔑
 
-Folded into the **Accounts** table where `type = 'savings_goal'`.
+Centralized table for permission definitions.
 
----
-
-### 4. Categories (No Change)
-
-No structural change.
-
----
-
-## IV. Impact on Summary Tables
-
-All summary tables now aggregate by **account_id** instead of **user_id**.
-
-### 1. daily_summary
-
-| Column Name    | Action   | Description      |
-| :------------- | :------- | :--------------- |
-| **user_id**    | **DROP** | Removed.         |
-| **account_id** | **ADD**  | Aggregation key. |
+| Column Name     | Type                      | Key/Index    | Description                                     |
+| --------------- | ------------------------- | ------------ | ----------------------------------------------- |
+| **id**          | `SERIAL`                  | Primary Key  | Role ID                                         |
+| **name**        | `VARCHAR(50)`             | Unique Index | Role name: 'owner', 'admin', 'editor', 'viewer' |
+| **permissions** | `JSONB`                   |              | JSON map for granular permissions               |
+| **description** | `TEXT`                    |              | Optional notes                                  |
+| **created_at**  | `TIMESTAMP DEFAULT NOW()` |              | Creation timestamp                              |
+| **updated_at**  | `TIMESTAMP DEFAULT NOW()` |              | Update timestamp                                |
 
 ---
 
-### 2. monthly_summary
+## III. Core Tables
 
-| Column Name    | Action   | Description      |
-| :------------- | :------- | :--------------- |
-| **user_id**    | **DROP** | Removed.         |
-| **account_id** | **ADD**  | Aggregation key. |
+### 1. `accounts` 🏦
+
+| Column Name         | Type                         | Key/Index               | Description                   |
+| ------------------- | ---------------------------- | ----------------------- | ----------------------------- |
+| **id**              | `SERIAL`                     | Primary Key             | Unique Account ID             |
+| **account_type_id** | `INT`                        | FK → `account_types.id` | Type of account               |
+| **owner_user_id**   | `INT`                        | FK → `users.id`         | Primary admin or creator      |
+| **name**            | `VARCHAR(100)`               |                         | Account name                  |
+| **description**     | `TEXT`                       |                         | Optional description          |
+| **balance**         | `DECIMAL(18,2) DEFAULT 0.00` |                         | Tracked balance               |
+| **currency_code**   | `VARCHAR(3)`                 | Index                   | ISO 4217 currency (e.g. USD)  |
+| **status**          | `VARCHAR(20)`                | Index                   | 'active', 'dormant', 'closed' |
+| **created_at**      | `TIMESTAMP DEFAULT NOW()`    |                         | Created date                  |
+| **updated_at**      | `TIMESTAMP DEFAULT NOW()`    |                         | Last updated date             |
 
 ---
 
-### 3. category_monthly_summary
+### 2. `user_accounts` 🤝
 
-| Column Name    | Action   | Description      |
-| :------------- | :------- | :--------------- |
-| **user_id**    | **DROP** | Removed.         |
-| **account_id** | **ADD**  | Aggregation key. |
+Pivot table connecting users with accounts and roles.
+
+| Column Name             | Type                      | Key/Index              | Description        |
+| ----------------------- | ------------------------- | ---------------------- | ------------------ |
+| **user_id**             | `INT`                     | PK, FK → `users.id`    | Linked user        |
+| **account_id**          | `INT`                     | PK, FK → `accounts.id` | Linked account     |
+| **role_id**             | `INT`                     | FK → `user_roles.id`   | Permission role    |
+| **assigned_by_user_id** | `INT`                     | FK → `users.id`        | Who granted access |
+| **is_active**           | `BOOLEAN DEFAULT TRUE`    |                        | Role status        |
+| **created_at**          | `TIMESTAMP DEFAULT NOW()` |                        | When assigned      |
+| **updated_at**          | `TIMESTAMP DEFAULT NOW()` |                        | When last updated  |
+
+✅ **Composite PK:** (`user_id`, `account_id`)
+
+---
+
+### 3. `transactions` 💸
+
+| Column Name            | Type                      | Key/Index               | Description                            |
+| ---------------------- | ------------------------- | ----------------------- | -------------------------------------- |
+| **id**                 | `SERIAL`                  | Primary Key             | Transaction ID                         |
+| **account_id**         | `INT`                     | FK → `accounts.id`      | Which account this affects             |
+| **creator_user_id**    | `INT`                     | FK → `users.id`         | Who created it                         |
+| **category_id**        | `INT`                     | FK → `categories.id`    | Optional category                      |
+| **type**               | `VARCHAR(10)`             | Index                   | 'income' / 'expense'                   |
+| **amount**             | `DECIMAL(18,2)`           |                         | Amount                                 |
+| **transaction_date**   | `DATE`                    | Index                   | For time-based summaries               |
+| **description**        | `TEXT`                    |                         | Optional notes                         |
+| **status**             | `VARCHAR(20)`             |                         | 'pending', 'cleared', 'void'           |
+| **external_ref_id**    | `VARCHAR(100)`            | Index (unique nullable) | Bank or processor reference            |
+| **recurring**          | `BOOLEAN DEFAULT FALSE`   |                         | Marks recurring payments               |
+| **recurring_interval** | `VARCHAR(20)`             |                         | 'daily', 'weekly', 'monthly', 'yearly' |
+| **created_at**         | `TIMESTAMP DEFAULT NOW()` |                         | Created date                           |
+| **updated_at**         | `TIMESTAMP DEFAULT NOW()` |                         | Last updated date                      |
+
+---
+
+## IV. Summary Tables (Aggregation by Account)
+
+| Table                      | Change                 | Description                            |
+| :------------------------- | :--------------------- | :------------------------------------- |
+| `daily_summary`            | `user_id → account_id` | Aggregates daily by account            |
+| `monthly_summary`          | `user_id → account_id` | Aggregates monthly by account          |
+| `category_monthly_summary` | `user_id → account_id` | Aggregates category totals per account |
+
+---
+
+## V. Entity Relationships Diagram (Simplified)
+
+```
+Users ──┬───────────────┐
+        │               │
+        ▼               ▼
+  UserAccounts       Accounts ─────── Transactions
+        │                 ▲
+        ▼                 │
+     UserRoles        AccountTypes
+```
+
+---
+
+## ✅ Notes
+
+- All tables use `created_at` and `updated_at` timestamps for auditability.
+- `account_types` and `user_roles` act as **lookup/metadata tables**, preventing hard-coded enums.
+- Aggregations (`daily_summary`, etc.) now pivot on `account_id`, enabling shared and multi-user accounts.
+- Ideal for future features like **family budgets**, **business workspaces**, and **AI analytics per account**.
+
+---
+
+Would you like me to provide the **TypeORM entity definitions** for all five key tables
+(`AccountType`, `UserRole`, `Account`, `UserAccount`, `Transaction`) next?
+They’ll be ready to drop directly into your Nest app.

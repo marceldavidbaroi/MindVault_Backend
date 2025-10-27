@@ -7,6 +7,8 @@ import { ReportsModule } from './reports/reports.module';
 import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SummaryModule } from './summary/summary.module';
+import { AccountsModule } from './accounts/accounts.module';
+import { AccountTypesModule } from './account_types/account_types.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { SummaryModule } from './summary/summary.module';
     SavingsGoalsModule,
     CategoriesModule,
     SummaryModule,
+    AccountsModule,
+    AccountTypesModule,
   ],
   exports: [
     TransactionsModule,

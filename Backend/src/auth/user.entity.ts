@@ -17,6 +17,7 @@ import { Category } from 'src/finance/categories/categories.entity';
 import { DailySummary } from 'src/finance/summary/daily_summary.entity';
 import { MonthlySummary } from 'src/finance/summary/monthly_summary.entity';
 import { MonthlyCategorySummary } from 'src/finance/summary/category_monthly_summary.entity';
+import { AccountType } from 'src/finance/account_types/account_types.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -69,4 +70,7 @@ export class User extends BaseEntity {
     (monthly_category_summary) => monthly_category_summary.user,
   )
   monthlyCategorySummaries: MonthlyCategorySummary[];
+
+  @OneToMany(() => AccountType, (account_type) => account_type.user)
+  accountTypes: AccountType[];
 }

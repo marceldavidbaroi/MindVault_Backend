@@ -1,13 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import * as cookieParser from 'cookie-parser'; // ✅ safer import for Nest
-import 'dotenv/config'; // ✅ load .env if not already loaded
+import cookieParser from 'cookie-parser'; // ✅ default import
+import 'dotenv/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // ✅ Cookie parser
+  // ✅ Use cookie parser
   app.use(cookieParser());
 
   // ✅ Global validation pipe
@@ -19,22 +19,26 @@ async function bootstrap() {
     }),
   );
 
-  // ✅ Parse CORS origins from env (comma-separated list)
-  const corsOrigins = process.env.CORS_ORIGINS?.split(',') || [];
+  // ✅ CORS from env
+  const corsOrigin =
+    process.env.CORS_ORIGIN?.replace(/^"|"$/g, '') || 'http://localhost:3001';
   const allowCredentials = process.env.CORS_CREDENTIALS === 'true';
 
   app.enableCors({
-    origin: corsOrigins,
+    origin: corsOrigin,
     credentials: allowCredentials,
   });
 
-  // ✅ Global prefix from env
+  // ✅ Global API prefix
   const prefix = process.env.API_PREFIX || 'api/v1';
   app.setGlobalPrefix(prefix);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`🚀 Server running on http://localhost:${port}/${prefix}`);
+  console.log('🚀 Server running on:');
+  console.log(`   → API:   http://localhost:${port}/${prefix}`);
+  console.log(`   → CORS:  ${corsOrigin}`);
 }
+
 bootstrap();

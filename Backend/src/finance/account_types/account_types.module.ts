@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountType } from './account_types.entity';
 import { AccountTypesService } from './account_types.service';
 import { AccountTypesController } from './account_types.controller';
-import { AccountTypeSeeder } from './accoun-types.seeder';
+import { AccountTypeSeeder } from './account-types.seeder';
 
 @Module({
   imports: [

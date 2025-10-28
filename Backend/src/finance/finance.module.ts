@@ -9,6 +9,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { SummaryModule } from './summary/summary.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { AccountTypesModule } from './account_types/account_types.module';
+import { CurrenciesModule } from './currencies/currencies.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AccountTypesModule } from './account_types/account_types.module';
     SummaryModule,
     AccountsModule,
     AccountTypesModule,
+    CurrenciesModule,
   ],
   exports: [
     TransactionsModule,

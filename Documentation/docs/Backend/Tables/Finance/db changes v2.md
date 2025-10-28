@@ -95,22 +95,23 @@ Pivot table connecting users with accounts and roles.
 
 ### 3. `transactions` 💸
 
-| Column Name            | Type                      | Key/Index               | Description                            |
-| ---------------------- | ------------------------- | ----------------------- | -------------------------------------- |
-| **id**                 | `SERIAL`                  | Primary Key             | Transaction ID                         |
-| **account_id**         | `INT`                     | FK → `accounts.id`      | Which account this affects             |
-| **creator_user_id**    | `INT`                     | FK → `users.id`         | Who created it                         |
-| **category_id**        | `INT`                     | FK → `categories.id`    | Optional category                      |
-| **type**               | `VARCHAR(10)`             | Index                   | 'income' / 'expense'                   |
-| **amount**             | `DECIMAL(18,2)`           |                         | Amount                                 |
-| **transaction_date**   | `DATE`                    | Index                   | For time-based summaries               |
-| **description**        | `TEXT`                    |                         | Optional notes                         |
-| **status**             | `VARCHAR(20)`             |                         | 'pending', 'cleared', 'void'           |
-| **external_ref_id**    | `VARCHAR(100)`            | Index (unique nullable) | Bank or processor reference            |
-| **recurring**          | `BOOLEAN DEFAULT FALSE`   |                         | Marks recurring payments               |
-| **recurring_interval** | `VARCHAR(20)`             |                         | 'daily', 'weekly', 'monthly', 'yearly' |
-| **created_at**         | `TIMESTAMP DEFAULT NOW()` |                         | Created date                           |
-| **updated_at**         | `TIMESTAMP DEFAULT NOW()` |                         | Last updated date                      |
+| Column Name            | Type                      | Key/Index               | Description                             |
+| ---------------------- | ------------------------- | ----------------------- | --------------------------------------- |
+| **id**                 | `SERIAL`                  | Primary Key             | Transaction ID                          |
+| **account_id**         | `INT`                     | FK → `accounts.id`      | Which account this affects              |
+| **creator_user_id**    | `INT`                     | FK → `users.id`         | Who created it                          |
+| **category_id**        | `INT`                     | FK → `categories.id`    | Optional category                       |
+| **type**               | `VARCHAR(10)`             | Index                   | 'income' / 'expense'                    |
+| **amount**             | `DECIMAL(18,2)`           |                         | Transaction amount                      |
+| **currency_code**      | `VARCHAR(3)`              | FK → `currencies.code`  | ISO 4217 currency (e.g., USD, EUR, BDT) |
+| **transaction_date**   | `DATE`                    | Index                   | For time-based summaries                |
+| **description**        | `TEXT`                    |                         | Optional notes                          |
+| **status**             | `VARCHAR(20)`             |                         | 'pending', 'cleared', 'void'            |
+| **external_ref_id**    | `VARCHAR(100)`            | Index (unique nullable) | Bank or processor reference             |
+| **recurring**          | `BOOLEAN DEFAULT FALSE`   |                         | Marks recurring payments                |
+| **recurring_interval** | `VARCHAR(20)`             |                         | 'daily', 'weekly', 'monthly', 'yearly'  |
+| **created_at**         | `TIMESTAMP DEFAULT NOW()` |                         | Created date                            |
+| **updated_at**         | `TIMESTAMP DEFAULT NOW()` |                         | Last updated date                       |
 
 ---
 
@@ -150,3 +151,19 @@ Users ──┬───────────────┐
 Would you like me to provide the **TypeORM entity definitions** for all five key tables
 (`AccountType`, `UserRole`, `Account`, `UserAccount`, `Transaction`) next?
 They’ll be ready to drop directly into your Nest app.
+
+Certainly! Here is the table converted to **Markdown** format:
+
+| Column         | Type        | Key/Index | Description                             |
+| :------------- | :---------- | :-------- | :-------------------------------------- |
+| **code**       | VARCHAR(3)  | PK        | ISO 4217 code, e.g. 'USD', 'EUR'        |
+| **name**       | VARCHAR(50) |           | Full currency name, e.g. 'US Dollar'    |
+| **symbol**     | VARCHAR(5)  |           | Currency symbol, e.g. '$'               |
+| **decimal**    | INT         |           | Number of decimal places (e.g. 2)       |
+| **is_active**  | BOOLEAN     |           | Enable/disable for selection in the app |
+| **created_at** | TIMESTAMP   |           | Creation timestamp                      |
+| **updated_at** | TIMESTAMP   |           | Last updated timestamp                  |
+
+---
+
+Would you like me to convert this table into a different format, like **HTML** or a **SQL `CREATE TABLE`** statement?

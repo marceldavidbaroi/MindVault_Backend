@@ -13,6 +13,7 @@ import { GetUser } from '../get-user.decorator';
 import { User } from '../entities/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import type { ApiResponse } from 'src/common/types/api-response.type';
+import { CreateSecurityQuestionDto } from '../dto/create-security-question.dto';
 
 @Controller('security-questions')
 @UseGuards(AuthGuard('jwt'))
@@ -36,7 +37,7 @@ export class SecurityQuestionController {
   @Post()
   async createSecurityQuestion(
     @GetUser() user: User,
-    @Body() body: { question: string; answer: string },
+    @Body() body: CreateSecurityQuestionDto,
   ): Promise<ApiResponse<any>> {
     const question = await this.service.createSecurityQuestion(
       user,
@@ -55,7 +56,7 @@ export class SecurityQuestionController {
   async updateSecurityQuestion(
     @GetUser() user: User,
     @Param('id') id: number,
-    @Body() body: { question: string; answer: string },
+    @Body() body: CreateSecurityQuestionDto,
   ): Promise<ApiResponse<any>> {
     const updated = await this.service.updateSecurityQuestion(
       user,

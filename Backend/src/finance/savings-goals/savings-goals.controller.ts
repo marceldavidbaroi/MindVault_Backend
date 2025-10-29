@@ -17,7 +17,7 @@ import { CreateSavingsGoalDto } from './dto/create-savings-goals.dto';
 import { UpdateSavingsGoalDto } from './dto/update-savings-goals.dto';
 import { FindSavingsGoalsDto } from './dto/find-savings-goal.dto';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { SavingsGoals } from './savings-goals.entity';
 import { ApiResponse } from 'src/common/types/api-response.type';
 

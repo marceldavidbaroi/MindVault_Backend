@@ -16,7 +16,7 @@ import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { FindTransactionsDto } from './dto/find-transaction.dto';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { Transactions } from './transactions.entity';
 import { ApiResponse } from 'src/common/types/api-response.type';
 import { BulkTransactionDto } from './dto/bulk-transaction.dto';

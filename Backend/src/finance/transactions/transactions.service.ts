@@ -10,7 +10,7 @@ import { Transactions } from './transactions.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { FindTransactionsDto } from './dto/find-transaction.dto';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { SummaryService } from 'src/finance/summary/summary.service';
 import { Category } from '../categories/categories.entity';
 import { Account } from '../account/account.entity';

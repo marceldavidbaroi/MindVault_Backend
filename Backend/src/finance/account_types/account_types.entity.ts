@@ -9,7 +9,7 @@ import {
   Index,
   OneToMany,
 } from 'typeorm';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { Account } from '../account/account.entity';
 
 @Entity('account_types')

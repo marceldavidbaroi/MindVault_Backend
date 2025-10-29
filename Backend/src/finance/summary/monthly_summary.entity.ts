@@ -6,7 +6,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 
 @Entity('monthly_summary')
 @Index(['user', 'year', 'month'], { unique: true }) // composite index

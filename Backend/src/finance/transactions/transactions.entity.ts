@@ -9,7 +9,7 @@ import {
   Index,
   Unique,
 } from 'typeorm';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { Category } from 'src/finance/categories/categories.entity';
 import { Account } from 'src/finance/account/account.entity';
 import { Currency } from 'src/finance/currencies/currencies.entity';

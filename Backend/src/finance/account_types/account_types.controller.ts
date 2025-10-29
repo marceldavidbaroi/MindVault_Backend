@@ -18,7 +18,7 @@ import { FilterAccountTypeDto } from './dto/filter-account-type.dto';
 import { ApiResponse } from 'src/common/types/api-response.type';
 import { AccountType } from './account_types.entity';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 
 @Controller('account-types')
 @UseGuards(AuthGuard('jwt'))

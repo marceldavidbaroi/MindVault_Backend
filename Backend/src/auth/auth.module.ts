@@ -1,24 +1,56 @@
 import { Module } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { AuthController } from './auth.controller';
+import { AuthService } from './services/auth.service';
+import { ForgotPasswordService } from './services/forgot-password.service';
+import { PasskeyService } from './services/passkey.service';
+import { ProfileService } from './services/profile.service';
+import { SecurityQuestionService } from './services/security-question.service';
+
+import { AuthController } from './controller/auth.controller';
+import { ForgotPasswordController } from './controller/forgot-password.controller';
+import { PasskeyController } from './controller/passkey.controller';
+import { ProfileController } from './controller/profile.controller';
+import { SecurityQuestionController } from './controller/security-question.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './user.entity';
+import { User } from './entities/user.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt.strategy';
-import { UserPreferences } from './userPreferences.entity';
+import { UserPreferences } from './entities/userPreferences.entity';
+import { UserSession } from './entities/userSessions.entity';
+import { PasswordResetLog } from './entities/passwordResetLog.entity';
+import { UserSecurityQuestion } from './entities/userSecurityQuestion.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserPreferences]),
+    TypeOrmModule.forFeature([
+      User,
+      UserPreferences,
+      UserSession,
+      PasswordResetLog,
+      UserSecurityQuestion,
+    ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'topSecret51',
       signOptions: { expiresIn: '1h' },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  controllers: [
+    AuthController,
+    ForgotPasswordController,
+    PasskeyController,
+    ProfileController,
+    SecurityQuestionController,
+  ],
+  providers: [
+    AuthService,
+    ForgotPasswordService,
+    PasskeyService,
+    PasskeyService,
+    ProfileService,
+    SecurityQuestionService,
+    JwtStrategy,
+  ],
   exports: [PassportModule, JwtStrategy],
 })
 export class AuthModule {}

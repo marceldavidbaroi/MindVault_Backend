@@ -10,7 +10,7 @@ import { AccountType } from './account_types.entity';
 import { CreateAccountTypeDto } from './dto/create-account-type.dto';
 import { UpdateAccountTypeDto } from './dto/update-account-type.dto';
 import { FilterAccountTypeDto } from './dto/filter-account-type.dto';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 
 @Injectable()
 export class AccountTypesService {

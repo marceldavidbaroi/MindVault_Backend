@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Budgets } from './budgets.entity';
 import { Repository } from 'typeorm';
 import { CreateBudgetDto } from './dto/create-budget.dto';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { FindBudgetsDto } from './dto/find-budget.dto';
 import { Transactions } from 'src/finance/transactions/transactions.entity';

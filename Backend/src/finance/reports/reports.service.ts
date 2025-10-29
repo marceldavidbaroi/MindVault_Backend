@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Reports, ReportType } from './reports.entity';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { TransactionsService } from 'src/finance/transactions/transactions.service';
 // import {
 //   ExpenseCategory,

@@ -16,7 +16,7 @@ import { CreateBudgetDto } from './dto/create-budget.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { FindBudgetsDto } from './dto/find-budget.dto';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { Budgets } from './budgets.entity';
 import { ApiResponse } from 'src/common/types/api-response.type';
 import { BudgetAlertsDto } from './dto/budget-alert.dto';

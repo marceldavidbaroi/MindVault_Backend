@@ -8,7 +8,7 @@ import {
   UpdateDateColumn,
   OneToMany,
 } from 'typeorm';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { AccountType } from '../account_types/account_types.entity'; // assuming exists
 import { Transactions } from '../transactions/transactions.entity';
 

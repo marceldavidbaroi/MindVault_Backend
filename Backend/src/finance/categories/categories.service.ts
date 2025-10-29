@@ -9,7 +9,7 @@ import { Category } from './categories.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { FilterCategoriesDto } from './dto/filter-category.dto';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 
 @Injectable()
 export class CategoriesService {

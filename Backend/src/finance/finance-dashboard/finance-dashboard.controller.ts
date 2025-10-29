@@ -5,7 +5,7 @@ import {
   CompareMonthQueryDto,
 } from './dto/finance-dashboard.dto.';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { ApiResponse } from 'src/common/types/api-response.type';
 import { FinanceDashboardService } from './finance-dashboard.service';
 

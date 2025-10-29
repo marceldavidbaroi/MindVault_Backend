@@ -5,7 +5,7 @@ import { SavingsGoals } from './savings-goals.entity';
 import { CreateSavingsGoalDto } from './dto/create-savings-goals.dto';
 import { UpdateSavingsGoalDto } from './dto/update-savings-goals.dto';
 import { FindSavingsGoalsDto } from './dto/find-savings-goal.dto';
-import { User } from 'src/auth/user.entity';
+import { User } from 'src/auth/entities/user.entity';
 import { TransactionsService } from 'src/finance/transactions/transactions.service';
 import { CreateTransactionDto } from 'src/finance/transactions/dto/create-transaction.dto';
 // import {

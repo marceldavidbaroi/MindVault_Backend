@@ -48,14 +48,11 @@ export class TransactionsController {
   async createBulk(
     @GetUser() user: User,
     @Body() bulkTransactionDto: BulkTransactionDto,
-  ) {
-    const { date, type, transactions } = bulkTransactionDto;
-
+  ): Promise<ApiResponse<Transactions[]>> {
+    // Call service with the DTO directly
     const createdTransactions = await this.transactionsService.createBulk(
       user,
-      type,
-      date,
-      transactions,
+      bulkTransactionDto,
     );
 
     return {
@@ -79,7 +76,7 @@ export class TransactionsController {
     return {
       success: true,
       message: 'Transactions fetched successfully',
-      data, // the actual array of transactions
+      data,
       meta: {
         total,
         page,

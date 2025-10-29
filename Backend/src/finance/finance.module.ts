@@ -7,7 +7,7 @@ import { ReportsModule } from './reports/reports.module';
 import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SummaryModule } from './summary/summary.module';
-import { AccountsModule } from './accounts/accounts.module';
+import { AccountModule } from './account/account.module';
 import { AccountTypesModule } from './account_types/account_types.module';
 import { CurrenciesModule } from './currencies/currencies.module';
 
@@ -20,7 +20,7 @@ import { CurrenciesModule } from './currencies/currencies.module';
     SavingsGoalsModule,
     CategoriesModule,
     SummaryModule,
-    AccountsModule,
+    AccountModule,
     AccountTypesModule,
     CurrenciesModule,
   ],

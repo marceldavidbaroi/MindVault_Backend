@@ -7,8 +7,10 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
+  OneToMany,
 } from 'typeorm';
 import { User } from 'src/auth/user.entity';
+import { Account } from '../account/account.entity';
 
 @Entity('account_types')
 @Index('idx_account_type_name', ['name'])
@@ -48,4 +50,7 @@ export class AccountType {
 
   @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => Account, (account) => account.accountType)
+  accounts: Account[];
 }

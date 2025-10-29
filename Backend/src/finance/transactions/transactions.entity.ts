@@ -5,56 +5,112 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  Index,
   JoinColumn,
+  Index,
+  Unique,
 } from 'typeorm';
 import { User } from 'src/auth/user.entity';
 import { Category } from 'src/finance/categories/categories.entity';
+import { Account } from 'src/finance/account/account.entity';
+import { Currency } from 'src/finance/currencies/currencies.entity';
 
 export type TransactionType = 'income' | 'expense';
 export type RecurringInterval = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type TransactionStatus = 'pending' | 'cleared' | 'void';
 
 @Entity('transactions')
-@Index('idx_user_date', ['user', 'date']) // For period queries
-@Index('idx_user_category_date', ['user', 'category', 'date']) // For category reports
-@Index('idx_user_recurring', ['user', 'recurring']) // For recurring transactions
+@Unique(['externalRefId'])
+@Index('idx_account_date', ['account', 'transactionDate'])
+@Index('idx_account_category_date', ['account', 'category', 'transactionDate'])
+@Index('idx_account_recurring', ['account', 'recurring'])
 export class Transactions {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, (user) => user.transactions, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  // 🔹 Which account this affects
+  @ManyToOne(() => Account, (account) => account.transactions, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'account_id' })
   @Index()
-  user: User;
+  account: Account;
 
-  @Column({ type: 'enum', enum: ['income', 'expense'] })
-  type: TransactionType;
+  // 🔹 Who created the transaction
+  @ManyToOne(() => User, (user) => user.transactions, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'creator_user_id' })
+  @Index()
+  creatorUser: User;
 
-  @ManyToOne(() => Category, { onDelete: 'SET NULL' })
+  // 🔹 Optional category
+  @ManyToOne(() => Category, (category) => category.transactions, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
   @JoinColumn({ name: 'category_id' })
   @Index()
-  category: Category;
+  category?: Category;
 
+  // 🔹 Transaction type
+  @Column({ type: 'varchar', length: 10 })
+  @Index()
+  type: TransactionType;
+
+  // 🔹 Transaction amount
   @Column('decimal', { precision: 18, scale: 2 })
   amount: number;
 
-  @Column({ type: 'date' })
-  date: string; // YYYY-MM-DD
+  // 🔹 Currency reference (nullable if optional)
+  @ManyToOne(() => Currency, (currency) => currency.transactions, {
+    onDelete: 'RESTRICT',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'currency_code', referencedColumnName: 'code' })
+  @Index()
+  currency?: Currency;
 
+  // 🔹 Transaction date
+  @Column({ type: 'date', name: 'transaction_date' })
+  @Index()
+  transactionDate: string; // YYYY-MM-DD
+
+  // 🔹 Optional description
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  // 🔹 Status
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: 'pending',
+  })
+  status: TransactionStatus;
+
+  // 🔹 External reference ID (optional)
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+    unique: true,
+    name: 'external_ref_id',
+  })
+  @Index()
+  externalRefId?: string;
+
+  // 🔹 Recurring flags
   @Column({ type: 'boolean', default: false })
   recurring: boolean;
 
   @Column({
-    type: 'enum',
-    enum: ['daily', 'weekly', 'monthly', 'yearly'],
+    type: 'varchar',
+    length: 20,
     nullable: true,
     name: 'recurring_interval',
   })
   recurringInterval?: RecurringInterval;
 
+  // 🔹 Timestamps
   @CreateDateColumn({ type: 'timestamp with time zone', name: 'created_at' })
   createdAt: Date;
 

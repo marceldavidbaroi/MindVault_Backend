@@ -7,8 +7,10 @@ import {
   JoinColumn,
   Unique,
   Index,
+  OneToMany,
 } from 'typeorm';
 import { User } from 'src/auth/user.entity';
+import { Transactions } from '../transactions/transactions.entity';
 
 @Entity('categories')
 @Unique(['name'])
@@ -35,4 +37,7 @@ export class Category {
 
   @CreateDateColumn({ type: 'timestamp with time zone', name: 'created_at' })
   createdAt: Date;
+
+  @OneToMany(() => Transactions, (transaction) => transaction.category)
+  transactions: Transactions[];
 }

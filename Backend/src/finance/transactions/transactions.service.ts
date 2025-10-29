@@ -4,22 +4,29 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Transactions } from './transactions.entity';
-import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Transactions } from './transactions.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { User } from 'src/auth/user.entity';
 import { FindTransactionsDto } from './dto/find-transaction.dto';
-import { SummaryService } from 'src/finance/summary/summary.service'; // 1. Import SummaryService
+import { User } from 'src/auth/user.entity';
+import { SummaryService } from 'src/finance/summary/summary.service';
 import { Category } from '../categories/categories.entity';
+import { Account } from '../account/account.entity';
+import { Currency } from '../currencies/currencies.entity';
+import {
+  BulkTransactionDto,
+  TransactionItemDto,
+} from './dto/bulk-transaction.dto';
 
 @Injectable()
 export class TransactionsService {
   constructor(
     @InjectRepository(Transactions)
     private transactionsRepository: Repository<Transactions>,
-    @Inject(forwardRef(() => SummaryService)) // ⚡ forwardRef solves circular DI
+
+    @Inject(forwardRef(() => SummaryService))
     private summaryService: SummaryService,
   ) {}
 
@@ -30,19 +37,27 @@ export class TransactionsService {
   ): Promise<Transactions> {
     const transaction = this.transactionsRepository.create({
       type: createTransactionDto.type,
-      category: { id: createTransactionDto.categoryId }, // ✅ relation by ID
       amount: createTransactionDto.amount,
-      date: createTransactionDto.date, // Use string date
+      transactionDate: createTransactionDto.transactionDate,
       description: createTransactionDto.description,
       recurring: createTransactionDto.recurring ?? false,
       recurringInterval: createTransactionDto.recurringInterval,
-      user: { id: user.id },
-    } as Partial<Transactions>);
+      status: createTransactionDto.status ?? 'pending',
+      account: createTransactionDto.accountId
+        ? ({ id: createTransactionDto.accountId } as Account)
+        : undefined,
+      category: createTransactionDto.categoryId
+        ? ({ id: createTransactionDto.categoryId } as Category)
+        : undefined,
+      currency: createTransactionDto.currencyCode
+        ? ({ code: createTransactionDto.currencyCode } as Currency)
+        : undefined,
+      creatorUser: { id: user.id } as User,
+    });
 
     const savedTransaction =
       await this.transactionsRepository.save(transaction);
 
-    // 3. HOOK: Notify SummaryService about the new transaction
     await this.summaryService.handleTransactionChange(
       undefined,
       savedTransaction,
@@ -51,7 +66,7 @@ export class TransactionsService {
     return savedTransaction;
   }
 
-  /** Find all transactions with optional filters + pagination */
+  /** Get all transactions with filters */
   async findAll(
     user: User,
     filters?: FindTransactionsDto,
@@ -67,33 +82,40 @@ export class TransactionsService {
 
     const query = this.transactionsRepository
       .createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.category', 'category') // ✅ join for filtering
-      .where('transaction.user_id = :userId', { userId: user.id });
+      .leftJoinAndSelect('transaction.account', 'account')
+      .leftJoinAndSelect('transaction.category', 'category')
+      .leftJoinAndSelect('transaction.currency', 'currency')
+      .where('transaction.creatorUser = :userId', { userId: user.id });
 
-    if (filters?.type) {
+    if (filters?.type)
       query.andWhere('transaction.type = :type', { type: filters.type });
-    }
-
-    if (filters?.categoryId) {
+    if (filters?.status)
+      query.andWhere('transaction.status = :status', {
+        status: filters.status,
+      });
+    if (filters?.accountId)
+      query.andWhere('account.id = :accountId', {
+        accountId: filters.accountId,
+      });
+    if (filters?.categoryId)
       query.andWhere('category.id = :categoryId', {
         categoryId: filters.categoryId,
       });
-    }
-
-    if (filters?.startDate) {
-      query.andWhere('transaction.date >= :startDate', {
-        startDate: new Date(filters.startDate).toISOString().split('T')[0], // Use string date for query
+    if (filters?.currencyCode)
+      query.andWhere('currency.code = :currencyCode', {
+        currencyCode: filters.currencyCode,
       });
-    }
-
-    if (filters?.endDate) {
-      query.andWhere('transaction.date <= :endDate', {
-        endDate: new Date(filters.endDate).toISOString().split('T')[0], // Use string date for query
+    if (filters?.startDate)
+      query.andWhere('transaction.transactionDate >= :startDate', {
+        startDate: filters.startDate,
       });
-    }
+    if (filters?.endDate)
+      query.andWhere('transaction.transactionDate <= :endDate', {
+        endDate: filters.endDate,
+      });
 
     const [data, total] = await query
-      .orderBy('transaction.updatedAt', 'DESC')
+      .orderBy('transaction.transactionDate', 'DESC')
       .skip(skip)
       .take(limit)
       .getManyAndCount();
@@ -101,37 +123,33 @@ export class TransactionsService {
     return { data, total, page, limit };
   }
 
-  /** Find a single transaction by numeric ID */
+  /** Find a transaction by ID */
   async findOne(id: number, user: User): Promise<Transactions> {
     const transaction = await this.transactionsRepository.findOne({
-      where: { id, user: { id: user.id } },
-      relations: ['category', 'user'], // ⚡ Added 'user' relation for summary hook compatibility
+      where: { id, creatorUser: { id: user.id } },
+      relations: ['account', 'category', 'currency', 'creatorUser'],
     });
 
-    if (!transaction) {
+    if (!transaction)
       throw new NotFoundException(
         `Transaction with ID ${id} not found for this user`,
       );
-    }
 
     return transaction;
   }
 
-  /** Remove a transaction */
+  /** Delete a transaction */
   async remove(id: number, user: User): Promise<void> {
-    // Load the full transaction object (including relations) before removal for the hook
     const transactionToRemove = await this.findOne(id, user);
 
     const result = await this.transactionsRepository.delete({
       id: transactionToRemove.id,
-      user: { id: user.id },
+      creatorUser: { id: user.id },
     });
 
-    if (result.affected === 0) {
+    if (result.affected === 0)
       throw new NotFoundException(`Transaction with ID ${id} not found.`);
-    }
 
-    // 4. HOOK: Notify SummaryService about the deletion
     await this.summaryService.handleTransactionChange(
       transactionToRemove,
       undefined,
@@ -144,35 +162,32 @@ export class TransactionsService {
     updateTransactionDto: UpdateTransactionDto,
     user: User,
   ): Promise<Transactions> {
-    // Load the transaction with required relations to capture the 'old' state for the hook
     const transaction = await this.findOne(id, user);
-
-    // Capture the 'old' state before applying changes
     const oldTransaction = { ...transaction };
 
-    // Update relations if DTO provides new IDs
-    if (updateTransactionDto.categoryId) {
+    if (updateTransactionDto.accountId)
+      transaction.account = { id: updateTransactionDto.accountId } as Account;
+
+    if (updateTransactionDto.categoryId)
       transaction.category = {
         id: updateTransactionDto.categoryId,
-      } as Category; // ⚡ FIX: Assert relation object as Category
-    }
+      } as Category;
 
-    // Update date column (must be serialized to YYYY-MM-DD string)
-    if (updateTransactionDto.date) {
-      transaction.date = new Date(updateTransactionDto.date) // ⚡ FIX: Convert Date to YYYY-MM-DD string
-        .toISOString()
-        .split('T')[0];
-    }
+    if (updateTransactionDto.currencyCode)
+      transaction.currency = {
+        code: updateTransactionDto.currencyCode,
+      } as Currency;
 
-    // Apply other updates
+    if (updateTransactionDto.transactionDate)
+      transaction.transactionDate = updateTransactionDto.transactionDate;
+
     Object.assign(transaction, updateTransactionDto);
 
     const savedTransaction =
       await this.transactionsRepository.save(transaction);
 
-    // 5. HOOK: Notify SummaryService about the update
     await this.summaryService.handleTransactionChange(
-      oldTransaction as Transactions,
+      oldTransaction,
       savedTransaction,
     );
 
@@ -180,38 +195,37 @@ export class TransactionsService {
   }
 
   /** Bulk create transactions */
+
   async createBulk(
     user: User,
-    type: 'income' | 'expense',
-    date: string | Date,
-    transactions: {
-      categoryId: number;
-      amount: number;
-      description?: string;
-    }[], // Added description field
+    bulkDto: BulkTransactionDto,
   ): Promise<Transactions[]> {
+    const { type, accountId, currencyCode, transactionDate, transactions } =
+      bulkDto;
+
     if (!transactions?.length) return [];
 
-    const txDate = new Date(date);
-    const dateStr = txDate.toISOString().split('T')[0]; // YYYY-MM-DD
-
-    const createdEntities = transactions.map((t) =>
-      this.transactionsRepository.create({
+    const createdEntities = transactions.map((t: TransactionItemDto) => {
+      const transaction = this.transactionsRepository.create({
         type,
-        category: { id: t.categoryId },
         amount: t.amount,
-        date: dateStr, // ⚡ FIX: Use string date
+        transactionDate,
         description:
-          t.description ||
-          `${type.charAt(0).toUpperCase() + type.slice(1)} transaction for ${dateStr}`,
-        user: { id: user.id },
-      } as Partial<Transactions>),
-    );
+          t.description ?? `${type} transaction for ${transactionDate}`,
+        account: { id: accountId } as Partial<Account>,
+        category: t.categoryId
+          ? ({ id: t.categoryId } as Partial<Category>)
+          : null,
+        currency: { code: currencyCode } as Partial<Currency>,
+        creatorUser: { id: user.id } as Partial<User>,
+      } as Partial<Transactions>);
+
+      return transaction;
+    });
 
     const savedTransactions =
       await this.transactionsRepository.save(createdEntities);
 
-    // 6. HOOK: Notify SummaryService for each bulk created transaction
     for (const txn of savedTransactions) {
       await this.summaryService.handleTransactionChange(undefined, txn);
     }

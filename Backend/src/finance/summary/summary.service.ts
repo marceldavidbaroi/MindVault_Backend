@@ -6,20 +6,19 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { Transactions } from 'src/finance/transactions/transactions.entity';
-// ⚡ Imported actual entity classes
 import { MonthlyCategorySummary } from './category_monthly_summary.entity';
 import { DailySummary } from './daily_summary.entity';
 import { MonthlySummary } from './monthly_summary.entity';
 import { GenerateReportDto } from './dto/filter-summary.dto';
 
-// ⚡ Renamed local interfaces to avoid conflict with the imported entity names
 interface IDailySummary {
   id: number;
   userId: number;
-  date: Date;
+  date: string;
   totalIncome: number;
   totalExpense: number;
 }
+
 interface IMonthlySummary {
   id: number;
   userId: number;
@@ -37,28 +36,25 @@ export class SummaryService {
   constructor(
     @InjectRepository(Transactions)
     private transactionsRepository: Repository<Transactions>,
-    // ⚡ Injecting the actual imported entity class (DailySummary)
+
     @InjectRepository(DailySummary)
     private dailySummaryRepository: Repository<DailySummary>,
-    // ⚡ Injecting the actual imported entity class (MonthlySummary)
+
     @InjectRepository(MonthlySummary)
     private monthlySummaryRepository: Repository<MonthlySummary>,
+
     @InjectRepository(MonthlyCategorySummary)
     private monthlyCategorySummaryRepository: Repository<MonthlyCategorySummary>,
   ) {}
 
-  /**
-   * Main handler for transaction changes (create, update, delete).
-   * Triggers the necessary recalculations for all affected periods and categories.
-   */
+  /** Handle transaction changes */
   async handleTransactionChange(
     oldTxn?: Transactions,
     newTxn?: Transactions,
   ): Promise<void> {
     try {
       const targetTxn = newTxn || oldTxn;
-      // Access user ID via the relation object's ID
-      const userId = targetTxn?.user?.id;
+      const userId = targetTxn?.creatorUser?.id;
 
       if (!userId) {
         this.logger.warn(
@@ -76,61 +72,40 @@ export class SummaryService {
       }[] = [];
 
       const extractKeys = (txn: Transactions) => {
-        // ⚡ Acknowledge that txn.date is a string as defined in the entity
-        const dateString = txn.date;
-
-        // Use a Date object to safely extract year and month from the date string
-        const dateObject = new Date(dateString);
+        const dateString = txn.transactionDate;
+        const dateObj = new Date(dateString);
 
         return {
           date: dateString,
-          year: dateObject.getFullYear(),
-          month: dateObject.getMonth() + 1, // 1-12
-          categoryId: txn.category?.id,
+          year: dateObj.getFullYear(),
+          month: dateObj.getMonth() + 1,
+          categoryId: txn.category?.id ?? 0,
           type: txn.type,
         };
       };
 
-      // Keys from the old state (for update/delete)
-      if (oldTxn) {
-        affectedKeys.push(extractKeys(oldTxn));
-      }
-
-      // Keys from the new state (for create/update)
+      if (oldTxn) affectedKeys.push(extractKeys(oldTxn));
       if (newTxn) {
         const newKeys = extractKeys(newTxn);
         const oldKeys = oldTxn ? extractKeys(oldTxn) : null;
 
-        // Check for duplicates based on old state keys
         const isDuplicate =
           oldTxn &&
           newKeys.date === oldKeys?.date &&
           newKeys.categoryId === oldKeys?.categoryId;
 
-        if (!isDuplicate) {
-          affectedKeys.push(newKeys);
-        }
+        if (!isDuplicate) affectedKeys.push(newKeys);
       }
 
-      // Filter for unique keys
       const uniqueKeys = Array.from(
         new Set(affectedKeys.map((k) => JSON.stringify(k))),
       ).map((s) => JSON.parse(s));
 
-      // 2. Process all unique affected keys
       for (const key of uniqueKeys) {
-        if (!key.categoryId) {
-          this.logger.error(
-            `Skipping summary update: Transaction missing categoryId for key: ${JSON.stringify(key)}`,
-          );
-          continue;
-        }
+        if (!key.categoryId) continue;
 
-        // Daily and Monthly summary
         await this.updateDailySummary(key.date, userId);
         await this.updateMonthlySummary(key.year, key.month, userId);
-
-        // Category Monthly Summary
         await this.updateCategoryMonthlySummary(
           key.year,
           key.month,
@@ -161,8 +136,8 @@ export class SummaryService {
         'SUM(CASE WHEN t.type = :expense THEN t.amount ELSE 0 END)',
         'total_expense',
       )
-      .where('t.user_id = :userId', { userId })
-      .andWhere('t.date = :date', { date: dateStr })
+      .where('t.creator_user_id = :userId', { userId })
+      .andWhere('t.transaction_date = :date', { date: dateStr })
       .setParameters({ income: 'income', expense: 'expense' })
       .getRawOne();
 
@@ -178,8 +153,8 @@ export class SummaryService {
       })
       .onConflict(
         `("user_id", "date") DO UPDATE SET 
-      "total_income" = EXCLUDED."total_income",
-      "total_expense" = EXCLUDED."total_expense"`,
+        "total_income" = EXCLUDED."total_income",
+        "total_expense" = EXCLUDED."total_expense"`,
       )
       .execute();
   }
@@ -206,9 +181,9 @@ export class SummaryService {
         'SUM(CASE WHEN t.type = :expense THEN t.amount ELSE 0 END)',
         'total_expense',
       )
-      .where('t.user_id = :userId', { userId })
-      .andWhere('t.date >= :monthStart', { monthStart })
-      .andWhere('t.date < :monthEnd', { monthEnd })
+      .where('t.creator_user_id = :userId', { userId })
+      .andWhere('t.transaction_date >= :monthStart', { monthStart })
+      .andWhere('t.transaction_date < :monthEnd', { monthEnd })
       .setParameters({ income: 'income', expense: 'expense' })
       .getRawOne();
 
@@ -228,8 +203,8 @@ export class SummaryService {
       })
       .onConflict(
         `("user_id", "year", "month") DO UPDATE SET 
-      "total_income" = EXCLUDED."total_income",
-      "total_expense" = EXCLUDED."total_expense"`,
+        "total_income" = EXCLUDED."total_income",
+        "total_expense" = EXCLUDED."total_expense"`,
       )
       .execute();
   }
@@ -251,11 +226,11 @@ export class SummaryService {
     const totalResult = await this.transactionsRepository
       .createQueryBuilder('t')
       .select('SUM(t.amount)', 'total_amount')
-      .where('t.user_id = :userId', { userId })
+      .where('t.creator_user_id = :userId', { userId })
       .andWhere('t.category_id = :categoryId', { categoryId })
       .andWhere('t.type = :type', { type })
-      .andWhere('t.date >= :monthStart', { monthStart })
-      .andWhere('t.date < :monthEnd', { monthEnd })
+      .andWhere('t.transaction_date >= :monthStart', { monthStart })
+      .andWhere('t.transaction_date < :monthEnd', { monthEnd })
       .getRawOne();
 
     await this.monthlyCategorySummaryRepository
@@ -272,10 +247,12 @@ export class SummaryService {
       })
       .onConflict(
         `("user_id", "year", "month", "category_id", "type") DO UPDATE SET 
-      "total_amount" = EXCLUDED."total_amount"`,
+        "total_amount" = EXCLUDED."total_amount"`,
       )
       .execute();
   }
+
+  /** Generate report */
   async generateReport(userId: number, dto: GenerateReportDto) {
     const { detailLevel, startDate, endDate } = dto;
     const start = new Date(startDate);
@@ -288,7 +265,6 @@ export class SummaryService {
       yearlySummary: null,
     };
 
-    // Helper functions
     const getYearMonthDays = (date: Date) => ({
       year: date.getFullYear(),
       month: date.getMonth() + 1,
@@ -330,7 +306,6 @@ export class SummaryService {
       report.yearlySummary = { year, totalIncome, totalExpense };
     };
 
-    // Main logic
     if (detailLevel === 'daily' || detailLevel === 'detailed') {
       let current = new Date(start);
       while (current <= end) {
@@ -369,6 +344,7 @@ export class SummaryService {
     return report;
   }
 
+  /** Dashboard summary */
   async getTransactionDashboardSummary(userId: number) {
     const today = new Date();
     const yesterday = new Date(today);
@@ -380,7 +356,6 @@ export class SummaryService {
     const prevMonth = thisMonth === 1 ? 12 : thisMonth - 1;
     const prevMonthYear = thisMonth === 1 ? thisYear - 1 : thisYear;
 
-    // --- Daily summaries
     const dailySummary = await this.dailySummaryRepository.findOne({
       where: { user: { id: userId }, date: today.toISOString().split('T')[0] },
     });
@@ -392,7 +367,6 @@ export class SummaryService {
       },
     });
 
-    // --- Monthly summaries
     const monthlySummary = await this.monthlySummaryRepository.findOne({
       where: { user: { id: userId }, year: thisYear, month: thisMonth },
     });
@@ -401,7 +375,6 @@ export class SummaryService {
       where: { user: { id: userId }, year: prevMonthYear, month: prevMonth },
     });
 
-    // --- Yearly summaries
     const yearlySummaries = await this.monthlySummaryRepository.find({
       where: { user: { id: userId }, year: thisYear },
     });
@@ -428,9 +401,9 @@ export class SummaryService {
       0,
     );
 
-    // --- Weekly spending (Mon–Sun) from DailySummary
+    // Weekly breakdown
     const startOfWeek = new Date(today);
-    const currentDay = startOfWeek.getDay(); // 0 = Sun, 1 = Mon
+    const currentDay = startOfWeek.getDay();
     const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
     startOfWeek.setDate(startOfWeek.getDate() + mondayOffset);
     startOfWeek.setHours(0, 0, 0, 0);
@@ -451,12 +424,10 @@ export class SummaryService {
 
     const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const weekMap = new Map<string, number>();
-
     dailySummaries.forEach((daySummary) => {
       const d = new Date(daySummary.date);
-      const day = dayOrder[d.getDay() === 0 ? 6 : d.getDay() - 1]; // JS Sun=0 → Sun=6
-      const amount = Number(daySummary.totalExpense || 0);
-      weekMap.set(day, amount);
+      const day = dayOrder[d.getDay() === 0 ? 6 : d.getDay() - 1];
+      weekMap.set(day, Number(daySummary.totalExpense || 0));
     });
 
     const weeklyBreakdown = dayOrder.map((day) => ({
@@ -469,12 +440,12 @@ export class SummaryService {
       0,
     );
 
-    // --- Total remaining income
+    // Total remaining income
     const totalRemainingIncomeAllTimeData =
       await this.monthlyCategorySummaryRepository
         .createQueryBuilder('mcs')
         .select('SUM(mcs.total_amount)', 'totalRemaining')
-        .where('mcs.user_id = :userId', { userId }) // <-- fix here
+        .where('mcs.user_id = :userId', { userId })
         .andWhere('mcs.type = :type', { type: 'income' })
         .getRawOne();
 
@@ -482,7 +453,7 @@ export class SummaryService {
       await this.monthlyCategorySummaryRepository
         .createQueryBuilder('mcs')
         .select('SUM(mcs.total_amount)', 'totalRemaining')
-        .where('mcs.user_id = :userId', { userId }) // <-- fix here
+        .where('mcs.user_id = :userId', { userId })
         .andWhere('mcs.year = :year', { year: thisYear })
         .andWhere('mcs.month = :month', { month: thisMonth })
         .andWhere('mcs.type = :type', { type: 'income' })
@@ -495,10 +466,9 @@ export class SummaryService {
       totalRemainingIncomeThisMonthData?.totalRemaining || 0,
     );
 
-    // --- Recent transactions (limit 5)
     const recentTransactions = await this.transactionsRepository.find({
-      where: { user: { id: userId } },
-      order: { date: 'DESC' },
+      where: { creatorUser: { id: userId } },
+      order: { transactionDate: 'DESC' },
       take: 5,
       relations: ['category'],
     });

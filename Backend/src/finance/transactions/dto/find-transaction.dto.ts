@@ -6,33 +6,54 @@ import {
   Max,
   IsDateString,
   IsNumber,
+  IsString,
+  Length,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { type TransactionType } from '../transactions.entity';
+import {
+  type TransactionType,
+  type TransactionStatus,
+} from '../transactions.entity';
 
 export class FindTransactionsDto {
   @IsOptional()
   @IsEnum(['income', 'expense'], {
-    message: 'Type must be either income or expense',
+    message: 'Type must be either "income" or "expense"',
   })
   type?: TransactionType;
 
   @IsOptional()
-  @Type(() => Number) // <-- converts string to number automatically
-  @IsNumber({}, { message: 'CategoryId must be a valid ID' })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Account ID must be a valid number' })
+  accountId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Category ID must be a valid number' })
   categoryId?: number;
+
+  @IsOptional()
+  @IsString({ message: 'Currency code must be a string' })
+  @Length(3, 3, { message: 'Currency code must be a 3-letter ISO 4217 code' })
+  currencyCode?: string;
+
+  @IsOptional()
+  @IsEnum(['pending', 'cleared', 'void'], {
+    message: 'Status must be one of: pending, cleared, void',
+  })
+  status?: TransactionStatus;
 
   @IsOptional()
   @IsDateString(
     {},
-    { message: 'startDate must be a valid ISO date string (YYYY-MM-DD)' },
+    { message: 'startDate must be a valid ISO date (YYYY-MM-DD)' },
   )
   startDate?: string;
 
   @IsOptional()
   @IsDateString(
     {},
-    { message: 'endDate must be a valid ISO date string (YYYY-MM-DD)' },
+    { message: 'endDate must be a valid ISO date (YYYY-MM-DD)' },
   )
   endDate?: string;
 

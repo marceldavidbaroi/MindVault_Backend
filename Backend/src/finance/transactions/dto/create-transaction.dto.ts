@@ -6,35 +6,44 @@ import {
   IsNumber,
   IsBoolean,
   IsDateString,
+  Length,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   type RecurringInterval,
   type TransactionType,
+  type TransactionStatus,
 } from '../transactions.entity';
-import { Type } from 'class-transformer';
 
 export class CreateTransactionDto {
   @IsEnum(['income', 'expense'], {
-    message: 'Type must be either income or expense',
+    message: 'Type must be either "income" or "expense"',
   })
   @IsNotEmpty()
   type: TransactionType;
 
-  @IsNumber({}, { message: 'Category must be a valid ID' })
-  @Type(() => Number) // <-- converts string to number automatically
-  @IsNotEmpty({ message: 'Category ID is required' })
-  categoryId: number;
+  @IsNumber({}, { message: 'Account ID must be a number' })
+  @Type(() => Number)
+  @IsNotEmpty({ message: 'Account ID is required' })
+  accountId: number;
 
-  @IsNumber({}, { message: 'Amount must be a number' })
+  @IsOptional()
+  @IsNumber({}, { message: 'Category ID must be a number' })
+  @Type(() => Number)
+  categoryId?: number;
+
+  @IsNumber({}, { message: 'Amount must be a valid number' })
   @IsNotEmpty({ message: 'Amount is required' })
   amount: number;
 
-  @IsDateString(
-    {},
-    { message: 'Date must be a valid ISO date string (YYYY-MM-DD)' },
-  )
-  @IsNotEmpty({ message: 'Date is required' })
-  date: string;
+  @IsString()
+  @Length(3, 3, { message: 'Currency code must be a 3-letter ISO 4217 code' })
+  @IsNotEmpty({ message: 'Currency code is required' })
+  currencyCode: string;
+
+  @IsDateString({}, { message: 'Transaction date must be a valid ISO string' })
+  @IsNotEmpty({ message: 'Transaction date is required' })
+  transactionDate: string; // ✅ matches entity field
 
   @IsOptional()
   @IsString({ message: 'Description must be a string' })
@@ -50,4 +59,10 @@ export class CreateTransactionDto {
       'Recurring interval must be one of: daily, weekly, monthly, yearly',
   })
   recurringInterval?: RecurringInterval;
+
+  @IsOptional()
+  @IsEnum(['pending', 'cleared', 'void'], {
+    message: 'Status must be one of: pending, cleared, void',
+  })
+  status?: TransactionStatus;
 }

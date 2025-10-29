@@ -18,6 +18,7 @@ import { DailySummary } from 'src/finance/summary/daily_summary.entity';
 import { MonthlySummary } from 'src/finance/summary/monthly_summary.entity';
 import { MonthlyCategorySummary } from 'src/finance/summary/category_monthly_summary.entity';
 import { AccountType } from 'src/finance/account_types/account_types.entity';
+import { Account } from 'src/finance/account/account.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -44,7 +45,7 @@ export class User extends BaseEntity {
   @OneToOne(() => UserPreferences, (pref) => pref.user, { cascade: true })
   preferences: UserPreferences;
 
-  @OneToMany(() => Transactions, (transaction) => transaction.user)
+  @OneToMany(() => Transactions, (transaction) => transaction.creatorUser)
   transactions: Transactions[];
 
   @OneToMany(() => Budgets, (budget) => budget.user)
@@ -73,4 +74,7 @@ export class User extends BaseEntity {
 
   @OneToMany(() => AccountType, (account_type) => account_type.user)
   accountTypes: AccountType[];
+
+  @OneToMany(() => Account, (account) => account.ownerUser)
+  accounts: AccountType[];
 }

@@ -47,16 +47,30 @@ export class PasskeyService {
     const currentUser = await this.findUser(user);
 
     if (currentUser.passkey !== passkey) {
+      // Log failed attempt
+      await this.passwordResetLogRepository.save({
+        user: currentUser,
+        method: 'passkey',
+        success: false,
+      });
+
       throw new BadRequestException('Invalid or expired passkey');
     }
 
     currentUser.password = await bcrypt.hash(newPassword, 10);
-
     currentUser.passkey = generatePasskey();
     currentUser.passkeyExpiresAt = undefined;
     currentUser.refreshToken = undefined;
 
     await this.userRepository.save(currentUser);
+
+    // Log successful reset
+    await this.passwordResetLogRepository.save({
+      user: currentUser,
+      method: 'passkey',
+      success: true,
+    });
+
     return {
       message: 'Password reset successfully',
       newPasskey: currentUser.passkey,
@@ -67,19 +81,40 @@ export class PasskeyService {
     user: User,
     oldPassword: string,
     newPassword: string,
+    ipAddress?: string, // optional
   ): Promise<{ message: string }> {
     const currentUser = await this.findUser(user);
 
     const isMatch = await bcrypt.compare(oldPassword, currentUser.password);
-    if (!isMatch) throw new BadRequestException('Old password is incorrect');
+    if (!isMatch) {
+      // Log failed manual change attempt
+      await this.passwordResetLogRepository.save({
+        user: currentUser,
+        method: 'manual',
+        success: false,
+        ipAddress,
+        note: 'Old password incorrect',
+      });
+
+      throw new BadRequestException('Old password is incorrect');
+    }
 
     currentUser.password = await bcrypt.hash(newPassword, 10);
-
     currentUser.passkey = generatePasskey();
     currentUser.passkeyExpiresAt = undefined;
     currentUser.refreshToken = undefined;
 
     await this.userRepository.save(currentUser);
+
+    // Log successful manual change
+    await this.passwordResetLogRepository.save({
+      user: currentUser,
+      method: 'manual',
+      success: true,
+      ipAddress,
+      note: 'User-initiated password change',
+    });
+
     return { message: 'Password changed successfully' };
   }
 }

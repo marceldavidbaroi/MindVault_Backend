@@ -4,16 +4,8 @@ import { GetUser } from '../get-user.decorator';
 import { User } from '../entities/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import type { ApiResponse } from 'src/common/types/api-response.type';
-
-interface ResetPasswordDto {
-  passkey: string;
-  newPassword: string;
-}
-
-interface ChangePasswordDto {
-  oldPassword: string;
-  newPassword: string;
-}
+import { ResetPasswordWithPasskeyDto } from '../dto/reset-password-passkey.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 
 @Controller('auth/passkey')
 @UseGuards(AuthGuard('jwt'))
@@ -37,7 +29,7 @@ export class PasskeyController {
   @Patch('/reset')
   async resetPasswordWithPasskey(
     @GetUser() user: User,
-    @Body() dto: ResetPasswordDto,
+    @Body() dto: ResetPasswordWithPasskeyDto,
   ): Promise<ApiResponse<{ newPasskey: string }>> {
     const result = await this.passkeyService.resetPasswordWithPasskey(
       user,

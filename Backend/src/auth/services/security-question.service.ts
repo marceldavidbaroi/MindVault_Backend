@@ -18,20 +18,30 @@ export class SecurityQuestionService {
     private readonly questionsRepository: Repository<UserSecurityQuestion>,
   ) {}
 
+  // ------------------- PASSWORD VERIFICATION -------------------
+  private async verifyPassword(user: User, password: string): Promise<void> {
+    const currentUser = await this.userRepository.findOne({
+      where: { id: user.id },
+    });
+    if (!currentUser) throw new NotFoundException('User not found');
+
+    const isMatch = await bcrypt.compare(password, currentUser.password);
+    if (!isMatch) throw new BadRequestException('Invalid password');
+  }
+
   // ------------------- SECURITY QUESTIONS -------------------
   async getSecurityQuestions(user: User): Promise<UserSecurityQuestion[]> {
     return this.questionsRepository.find({ where: { user: { id: user.id } } });
   }
 
+  // Create a new security question
   async createSecurityQuestion(
     user: User,
     question: string,
     answer: string,
+    password: string,
   ): Promise<any> {
-    const currentUser = await this.userRepository.findOne({
-      where: { id: user.id },
-    });
-    if (!currentUser) throw new NotFoundException('User not found');
+    await this.verifyPassword(user, password);
 
     const count = await this.questionsRepository.count({
       where: { user: { id: user.id } },
@@ -48,7 +58,6 @@ export class SecurityQuestionService {
     const saved = await this.questionsRepository.save(newQuestion);
 
     const { id, username, email } = saved.user;
-
     return {
       id: saved.id,
       user: { id, username, email },
@@ -58,12 +67,16 @@ export class SecurityQuestionService {
     };
   }
 
+  // Update an existing security question
   async updateSecurityQuestion(
     user: User,
     questionId: number,
     question: string,
     answer: string,
+    password: string,
   ): Promise<UserSecurityQuestion> {
+    await this.verifyPassword(user, password);
+
     const questionEntity = await this.questionsRepository.findOne({
       where: { id: questionId, user: { id: user.id } },
     });
@@ -74,7 +87,14 @@ export class SecurityQuestionService {
     return this.questionsRepository.save(questionEntity);
   }
 
-  async deleteSecurityQuestion(user: User, questionId: number): Promise<void> {
+  // Delete a security question
+  async deleteSecurityQuestion(
+    user: User,
+    questionId: number,
+    password: string,
+  ): Promise<void> {
+    await this.verifyPassword(user, password);
+
     const questionEntity = await this.questionsRepository.findOne({
       where: { id: questionId, user: { id: user.id } },
     });

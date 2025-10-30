@@ -18,4 +18,12 @@ export class CreateSecurityQuestionDto {
   @IsString()
   @MinLength(1, { message: 'Answer cannot be empty' })
   answer: string;
+
+  @ApiProperty({
+    description: 'Current password of the user for verification',
+    example: 'MySecretPassword123!',
+  })
+  @IsString()
+  @MinLength(6, { message: 'Password must be at least 6 characters' })
+  password: string;
 }

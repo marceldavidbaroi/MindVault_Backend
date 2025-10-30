@@ -14,6 +14,7 @@ import { User } from '../entities/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import type { ApiResponse } from 'src/common/types/api-response.type';
 import { CreateSecurityQuestionDto } from '../dto/create-security-question.dto';
+import { DeleteSecurityQuestionDto } from '../dto/delete-security-question.dto';
 
 @Controller('security-questions')
 @UseGuards(AuthGuard('jwt'))
@@ -43,6 +44,7 @@ export class SecurityQuestionController {
       user,
       body.question,
       body.answer,
+      body.password,
     );
     return {
       success: true,
@@ -63,6 +65,7 @@ export class SecurityQuestionController {
       id,
       body.question,
       body.answer,
+      body.password,
     );
     return {
       success: true,
@@ -76,8 +79,9 @@ export class SecurityQuestionController {
   async deleteSecurityQuestion(
     @GetUser() user: User,
     @Param('id') id: number,
+    @Body() dto: DeleteSecurityQuestionDto,
   ): Promise<ApiResponse<null>> {
-    await this.service.deleteSecurityQuestion(user, id);
+    await this.service.deleteSecurityQuestion(user, id, dto.password);
     return {
       success: true,
       message: 'Security question deleted successfully',

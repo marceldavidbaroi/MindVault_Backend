@@ -30,6 +30,7 @@ export class SecurityQuestionService {
   }
 
   // ------------------- SECURITY QUESTIONS -------------------
+
   async getSecurityQuestions(user: User): Promise<UserSecurityQuestion[]> {
     return this.questionsRepository.find({ where: { user: { id: user.id } } });
   }
@@ -55,7 +56,14 @@ export class SecurityQuestionService {
       question,
       answerHash: hashedAnswer,
     });
+
     const saved = await this.questionsRepository.save(newQuestion);
+
+    // ✅ Ensure user.hasSecurityQuestions = true
+    if (!user.hasSecurityQuestions) {
+      user.hasSecurityQuestions = true;
+      await this.userRepository.save(user);
+    }
 
     const { id, username, email } = saved.user;
     return {
@@ -101,5 +109,15 @@ export class SecurityQuestionService {
     if (!questionEntity) throw new NotFoundException('Question not found');
 
     await this.questionsRepository.remove(questionEntity);
+
+    // ✅ After deletion, check remaining count
+    const remaining = await this.questionsRepository.count({
+      where: { user: { id: user.id } },
+    });
+
+    if (remaining === 0 && user.hasSecurityQuestions) {
+      user.hasSecurityQuestions = false;
+      await this.userRepository.save(user);
+    }
   }
 }

@@ -17,11 +17,11 @@ import { ChangePasswordDto } from '../dto/change-password.dto';
 import { GetPasskeyDto } from '../dto/get-passkey.dto';
 
 @Controller('auth/passkey')
-@UseGuards(AuthGuard('jwt'))
 export class PasskeyController {
   constructor(private readonly passkeyService: PasskeyService) {}
 
   // ------------------- GET CURRENT PASSKEY -------------------
+  @UseGuards(AuthGuard('jwt'))
   @Post()
   async getPasskey(
     @GetUser() user: User,
@@ -39,13 +39,13 @@ export class PasskeyController {
   }
 
   // ------------------- RESET PASSWORD USING PASSKEY -------------------
+  // No AuthGuard here
   @Patch('/reset')
   async resetPasswordWithPasskey(
-    @GetUser() user: User,
     @Body() dto: ResetPasswordWithPasskeyDto,
   ): Promise<ApiResponse<{ newPasskey: string }>> {
     const result = await this.passkeyService.resetPasswordWithPasskey(
-      user,
+      dto.username, // No user from JWT
       dto.passkey,
       dto.newPassword,
     );
@@ -57,6 +57,7 @@ export class PasskeyController {
   }
 
   // ------------------- CHANGE PASSWORD WITH OLD PASSWORD -------------------
+  @UseGuards(AuthGuard('jwt'))
   @Patch('/change')
   async changePassword(
     @GetUser() user: User,

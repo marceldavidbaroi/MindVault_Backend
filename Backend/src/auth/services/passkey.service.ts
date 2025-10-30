@@ -61,11 +61,18 @@ export class PasskeyService {
   }
 
   async resetPasswordWithPasskey(
-    user: User,
+    username: string,
     passkey: string,
     newPassword: string,
   ): Promise<{ message: string; newPasskey: string }> {
-    const currentUser = await this.findUser(user);
+    // Find user by username
+    const currentUser = await this.userRepository.findOne({
+      where: { username },
+    });
+
+    if (!currentUser) {
+      throw new BadRequestException('User not found');
+    }
 
     if (currentUser.passkey !== passkey) {
       // Log failed attempt
@@ -78,6 +85,7 @@ export class PasskeyService {
       throw new BadRequestException('Invalid or expired passkey');
     }
 
+    // Update password and reset passkey
     currentUser.password = await bcrypt.hash(newPassword, 10);
     currentUser.passkey = generatePasskey();
     currentUser.passkeyExpiresAt = undefined;

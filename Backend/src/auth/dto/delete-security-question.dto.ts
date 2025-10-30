@@ -9,6 +9,6 @@ export class DeleteSecurityQuestionDto {
     example: 'MySecretPassword123!',
   })
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters' })
+  @MinLength(2, { message: 'Password must be at least 6 characters' })
   password: string;
 }

@@ -8,11 +8,7 @@ import {
 } from '@nestjs/common';
 import { ForgotPasswordService } from '../services/forgot-password.service';
 import type { ApiResponse } from 'src/common/types/api-response.type';
-
-interface VerifyForgotAnswersDto {
-  answers: { questionId: number; answer: string }[];
-  newPassword: string;
-}
+import { VerifyForgotAnswersDto } from '../dto/verify-forgot-answers.dto';
 
 @Controller('auth/forgot-password')
 export class ForgotPasswordController {

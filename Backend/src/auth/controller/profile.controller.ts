@@ -4,6 +4,8 @@ import { GetUser } from '../get-user.decorator';
 import { User } from '../entities/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import type { ApiResponse } from 'src/common/types/api-response.type';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { UpdatePreferencesDto } from '../dto/update-preferences.dto';
 
 @Controller('profile')
 @UseGuards(AuthGuard('jwt'))
@@ -27,7 +29,7 @@ export class ProfileController {
   @Patch()
   async updateProfile(
     @GetUser() user: User,
-    @Body() updateData: Partial<User>,
+    @Body() updateData: UpdateProfileDto,
   ): Promise<ApiResponse<Partial<User>>> {
     const updated = await this.profileService.updateProfile(user, updateData);
     return {
@@ -42,10 +44,7 @@ export class ProfileController {
   async updatePreferences(
     @GetUser() user: User,
     @Body()
-    updateData: {
-      frontend?: Record<string, any>;
-      backend?: Record<string, any>;
-    },
+    updateData: UpdatePreferencesDto,
   ): Promise<
     ApiResponse<{
       frontend?: Record<string, any>;

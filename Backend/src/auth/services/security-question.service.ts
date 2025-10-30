@@ -27,7 +27,7 @@ export class SecurityQuestionService {
     user: User,
     question: string,
     answer: string,
-  ): Promise<UserSecurityQuestion> {
+  ): Promise<any> {
     const currentUser = await this.userRepository.findOne({
       where: { id: user.id },
     });
@@ -45,7 +45,17 @@ export class SecurityQuestionService {
       question,
       answerHash: hashedAnswer,
     });
-    return this.questionsRepository.save(newQuestion);
+    const saved = await this.questionsRepository.save(newQuestion);
+
+    const { id, username, email } = saved.user;
+
+    return {
+      id: saved.id,
+      user: { id, username, email },
+      question: saved.question,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt,
+    };
   }
 
   async updateSecurityQuestion(

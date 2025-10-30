@@ -1,17 +1,22 @@
 import { IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
 import { FrontendPreferencesDto } from './frontend-preferences.dto';
 import { BackendPreferencesDto } from './backend-preferences.dto';
 
 export class UpdatePreferencesDto {
   @ApiPropertyOptional({
     description: 'Frontend preferences of the user',
-    type: FrontendPreferencesDto,
+    type: 'object',
+    allOf: [{ $ref: getSchemaPath(FrontendPreferencesDto) }],
+    additionalProperties: false, // ✅ required by Swagger when type = 'object'
     example: {
       theme: 'dark',
       layout: 'grid',
-      customSetting: 'value',
+      extra: {
+        showSidebar: true,
+        language: 'en',
+      },
     },
   })
   @IsOptional()
@@ -21,11 +26,15 @@ export class UpdatePreferencesDto {
 
   @ApiPropertyOptional({
     description: 'Backend preferences of the user',
-    type: BackendPreferencesDto,
+    type: 'object',
+    allOf: [{ $ref: getSchemaPath(BackendPreferencesDto) }],
+    additionalProperties: false, // ✅ fixes the TS error
     example: {
       notifications: true,
-      autoSync: false,
-      customOption: 'value',
+      extra: {
+        autoSync: false,
+        timezone: 'Asia/Dhaka',
+      },
     },
   })
   @IsOptional()

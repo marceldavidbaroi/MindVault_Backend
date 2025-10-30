@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -29,10 +30,30 @@ export class PasskeyService {
   }
 
   // ------------------- PASSKEY -------------------
+
   async getPasskey(
     user: User,
+    password: string, // <-- password to verify
   ): Promise<{ passkey?: string; expiresAt?: Date }> {
+    // Find the user in the database
     const currentUser = await this.findUser(user);
+    if (!currentUser) {
+      throw new Error('User not found');
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      currentUser.password,
+    ); // use correct hashed password field
+    if (!isPasswordValid) {
+      throw new BadRequestException('Incorrect password');
+    }
+    if (!isPasswordValid) {
+      throw new Error('Invalid password');
+    }
+
+    // Return passkey if password is valid
     return {
       passkey: currentUser.passkey,
       expiresAt: currentUser.passkeyExpiresAt,

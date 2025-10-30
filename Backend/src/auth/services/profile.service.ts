@@ -39,7 +39,7 @@ export class ProfileService {
   // ------------------- PROFILE -------------------
   async getProfile(user: User) {
     const currentUser = await this.findUser(user.id);
-    const { password, refreshToken, ...safeUser } = currentUser;
+    const { password, refreshToken, passkey, ...safeUser } = currentUser;
 
     return {
       ...safeUser,
@@ -52,7 +52,7 @@ export class ProfileService {
     Object.assign(currentUser, updateData);
     await this.userRepository.save(currentUser);
 
-    const { password, refreshToken, ...safeUser } = currentUser;
+    const { password, refreshToken, passkey, ...safeUser } = currentUser;
     return safeUser;
   }
 

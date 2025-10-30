@@ -17,9 +17,12 @@ import { authCredentialsDto } from '../dto/auth-credentials.dto';
 import { SigninDto } from '../dto/sign-in.dto';
 import { generatePasskey } from '../utils/passkey.util';
 
-interface JwtPayload {
+export interface JwtPayload {
   sub: number;
+  email?: string;
   username: string;
+  exp?: number; // ✅ add this
+  iat?: number; // ✅ add this
 }
 
 @Injectable()
@@ -149,7 +152,7 @@ export class AuthService {
     }
 
     const session = await this.userSessionRepository.findOne({
-      where: { user: { id: payload.sub } },
+      where: { user: { id: Number(payload.sub) } },
     });
 
     if (
@@ -159,8 +162,15 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token invalid or expired');
     }
 
-    const newAccessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
-    const newRefreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    // ✅ Remove exp and iat before re-signing
+    const { exp, iat, ...cleanPayload } = payload;
+
+    const newAccessToken = this.jwtService.sign(cleanPayload, {
+      expiresIn: '1h',
+    });
+    const newRefreshToken = this.jwtService.sign(cleanPayload, {
+      expiresIn: '7d',
+    });
 
     session.refreshToken = await bcrypt.hash(newRefreshToken, 10);
     session.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

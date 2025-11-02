@@ -16,8 +16,12 @@ export class CategoriesService {
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
   ) {}
-
   async createCategory(user: User, dto: CreateCategoryDto): Promise<Category> {
+    // Prevent creating global categories
+    if (dto.scope === CategoryScope.GLOBAL) {
+      throw new BadRequestException('Cannot create global category');
+    }
+
     const category = this.categoryRepo.create({
       ...dto,
       user:
@@ -25,8 +29,9 @@ export class CategoriesService {
         dto.scope === CategoryScope.FAMILY
           ? user
           : undefined,
-      scope: dto.scope || CategoryScope.GLOBAL,
+      scope: dto.scope || CategoryScope.INDIVIDUAL, // default to GLOBAL? maybe change default to INDIVIDUAL
     });
+
     return this.categoryRepo.save(category);
   }
 
@@ -67,14 +72,17 @@ export class CategoriesService {
 
     await this.categoryRepo.remove(category);
   }
-
   async getCategory(id: number, user: User): Promise<Category> {
     const category = await this.categoryRepo.findOne({ where: { id } });
     if (!category) throw new NotFoundException('Category not found');
 
+    // Allow viewing if:
+    // - Not individual (GLOBAL, BUSINESS, FAMILY)
+    // - Or individual AND either owned by user OR system-defined (user = null)
     if (
       category.scope === CategoryScope.INDIVIDUAL &&
-      category.user?.id !== user.id
+      category.user?.id !== user.id &&
+      category.user !== undefined // means it's user-defined
     ) {
       throw new BadRequestException('Not authorized to view this category');
     }

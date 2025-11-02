@@ -25,9 +25,9 @@ import { ApiResponse } from 'src/common/types/api-response.type';
 import { Category } from './categories.entity';
 import { FilterCategoryDto } from './dto/filter-category.dto';
 
-@ApiTags('Categories')
+@ApiTags('Finance Categories')
 @UseGuards(AuthGuard('jwt'))
-@Controller('categories')
+@Controller('finance/categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 

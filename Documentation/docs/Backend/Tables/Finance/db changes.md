@@ -1,65 +1,294 @@
-# Implementation Roadmap for Scalable Finance Schema Refactor
-
-This roadmap outlines a four-phase plan to implement the critical schema changes, including the new **Categories table** and the **three Materialized Views (Summary Tables)**. The plan prioritizes setting up the necessary infrastructure, then establishing the data integrity pipeline, and finally refactoring the read-heavy features for maximum performance.
+Perfect! Let’s focus on creating a **detailed implementation plan for your Finance Module**, assuming your **User** and **UserRole** entities already exist in a separate module. I’ll structure it **per module**, listing **entities, services, endpoints, and implementation flow**, keeping scalability, reusability, and maintainability in mind.
 
 ---
 
-## Phase 0: Setup and Preparation
+# **Finance Module – Implementation Plan**
 
-The goal is to create the necessary code modules and set up initial data structures without affecting existing features.
+## **1. Category Module**
 
-| Step | Task | Target Module(s) | Notes |
-| :--- | :--- | :--- | :--- |
-| **0.1** | **Create `CategoriesModule`** | `CategoriesModule` | Define the `Categories` entity and repository. **Pre-populate** this table with all system/default income and expense categories. |
-| **0.2** | **Create `SummaryModule`** | `SummaryModule` | Define the three new entities (`daily_summary`, `monthly_summary`, `category_monthly_summary`) and their repositories. Create the basic `SummaryService` shell. |
-| **0.3** | **Set `DATE` type consistency** | All Tables | Ensure all date columns (`Transactions.date`, `Reports.period_start`, etc.) are consistently using the SQL **`DATE`** type (YYYY-MM-DD format). |
+**Purpose:** Manage categories for transactions (income/expense), both global and user-specific.
 
----
+**Entities:**
 
-## Phase 1: Database Refactoring & Data Migration 💾
+- `Category` (FK `userId` → User, nullable for global)
 
-This phase involves the critical structural changes to the database and requires careful data migration.
+**Services:**
 
-| Step | Task | Target Tables | Rationale |
-| :--- | :--- | :--- | :--- |
-| **1.1** | **Deploy New Tables** | `Categories`, `daily_summary`, `monthly_summary`, `category_monthly_summary` | Deploy all 4 new tables with their defined Primary Keys and **Composite Indexes**. |
-| **1.2** | **Migrate Category Data (Crucial Step)** | `Transactions`, `Budgets` | 1. Add the new **`category_id`** column (`INT`) to both tables. 2. Run a migration script: Map existing string/enum category values to the corresponding `id` in the new `Categories` table. |
-| **1.3** | **Remove Legacy Column** | `Transactions`, `Budgets` | Once migration is verified, **drop the old `category` column** to enforce the new foreign key relationship. |
+- `CategoryService`
 
----
+  - `createCategory(userId, dto)` → create a category
+  - `updateCategory(categoryId, dto)`
+  - `deleteCategory(categoryId)`
+  - `getCategory(categoryId)`
+  - `listCategories(userId?, filters?)` → returns all or filtered categories
 
-## Phase 2: Implementing the Write Path (Data Integrity) ✍️
+**Endpoints (Controller):**
 
-This phase establishes the **data integrity pipeline**, shifting the computational load from read queries to write operations by updating the materialized views.
+- `POST /categories` → create category
+- `PUT /categories/:id` → update category
+- `DELETE /categories/:id` → delete category
+- `GET /categories/:id` → get single category
+- `GET /categories` → list categories (query: userId, type, search)
 
-| Step | Task | Target Module(s) | Rationale |
-| :--- | :--- | :--- | :--- |
-| **2.1** | **Develop `SummaryService` Logic** | `SummaryService` | Implement the upsert logic for the three core methods (`updateDailySummary`, `updateMonthlySummary`, `updateCategoryMonthlySummary`). This includes recalculating the `net_savings_rate`. |
-| **2.2** | **Hook into Transactions Service** | `TransactionsService` | Import and inject `SummaryService`. Modify the `create`, `update`, and `delete` methods to call the corresponding `SummaryService` methods *immediately after* the database change. |
-| **2.3** | **Refactor Savings Goals Hook** | `SavingsGoalsService` | Ensure any method that alters a transaction related to a savings goal (like adding a contribution) correctly triggers the `TransactionsService` hook. |
-| **2.4** | **Initial Summary Backfill** | N/A | Run a **one-time backfill script** to aggregate all historical transactions and fully populate the three summary tables. |
+**Flow:**
 
----
-
-## Phase 3: Performance Refactoring (The Read Path) 📈
-
-This phase refactors the high-traffic features to read exclusively from the fast, pre-aggregated summary tables.
-
-| Step | Task | Target Module(s) | Performance Benefit |
-| :--- | :--- | :--- | :--- |
-| **3.1** | **Refactor Budget Alerts** | `BudgetsService` | Change `getBudgetAlerts()` to query **`category_monthly_summary`** directly to get total spending per category for the current period (solves the N+1 query problem). |
-| **3.2** | **Refactor Dashboard Metrics** | `FinanceDashboardService` | Rewrite all summary metrics (Daily totals, MoM comparison, Net Savings Rate) to read from **`daily_summary` and `monthly_summary`**. |
-| **3.3** | **Refactor Reporting Engine** | `ReportsService` | Change report generation to pull aggregated figures and time-series data from the summary tables instead of joining and summing the large `Transactions` table. |
-| **3.4** | **Testing & Benchmarking** | All Modules | Execute load tests to verify the dramatic performance improvements on Dashboard and Report endpoints. |
+1. Validate `userId` and payload.
+2. Ensure global categories cannot be deleted by users.
+3. Return created/updated entity.
 
 ---
 
-## Phase 4: New Feature & Rollout ✨
+## **2. Account Module**
 
-The final phase implements the flexibility feature enabled by the new schema and prepares for deployment.
+**Purpose:** Manage accounts, account types, and user-account-role mapping for shared accounts.
 
-| Step | Task | Target Module(s) | Objective |
-| :--- | :--- | :--- | :--- |
-| **4.1** | **Implement Custom Category CRUD** | `CategoriesModule` | Build the API endpoints for users to **create, read, update, and delete custom categories** (managing rows where `Categories.user_id` is present). |
-| **4.2** | **Update UI/UX** | Frontend | Update all forms (Transaction entry, Budget setup) to select categories using the new **`category_id`** foreign key and display the flexible `display_name`. |
-| **4.3** | **Final End-to-End QA** | All Modules | Comprehensive testing to confirm that the new write path is stable and that all API response times meet the performance targets. |
+**Entities:**
+
+- `AccountType`
+- `Account`
+- `AccountUserRole` (maps user → account → role)
+
+**Services:**
+
+- `AccountService`
+
+  - `createAccount(dto)`
+  - `updateAccount(accountId, dto)`
+  - `deleteAccount(accountId)`
+  - `getAccount(accountId)`
+  - `listAccounts(userId?)`
+
+- `AccountTypeService`
+
+  - `listAccountTypes()`
+
+- `AccountUserRoleService`
+
+  - `assignRole(accountId, userId, roleId)`
+  - `updateRole(accountId, userId, roleId)`
+  - `removeRole(accountId, userId)`
+  - `listRoles(accountId)`
+
+**Endpoints:**
+
+- `POST /accounts` → create account
+- `PUT /accounts/:id` → update account
+- `DELETE /accounts/:id` → delete account
+- `GET /accounts/:id` → get account
+- `GET /accounts` → list accounts for a user
+- `POST /accounts/:id/roles` → assign role
+- `PUT /accounts/:id/roles/:userId` → update role
+- `DELETE /accounts/:id/roles/:userId` → remove role
+- `GET /accounts/:id/roles` → list account roles
+
+**Flow:**
+
+1. Create AccountType first if needed.
+2. Create Account with initial balance.
+3. Assign roles to users for shared access.
+4. Check permissions in TransactionModule when performing actions.
+
+---
+
+## **3. Transaction Module**
+
+**Purpose:** Ledger management of incomes and expenses, recurring transactions.
+
+**Entities:**
+
+- `Transaction`
+- `RecurringTransactionSchedule`
+
+**Services:**
+
+- `TransactionService`
+
+  - `createTransaction(userId, dto)`
+  - `updateTransaction(transactionId, dto)`
+  - `deleteTransaction(transactionId)`
+  - `getTransaction(transactionId)`
+  - `listTransactions(filters?)` (by accountId, categoryId, date range)
+  - `processRecurringTransactions()` → scheduled job
+
+- `RecurringTransactionService`
+
+  - `scheduleNext(transactionId)`
+
+**Endpoints:**
+
+- `POST /transactions` → create transaction
+- `PUT /transactions/:id` → update transaction
+- `DELETE /transactions/:id` → delete transaction
+- `GET /transactions/:id` → get transaction
+- `GET /transactions` → list transactions (filters supported)
+
+**Flow:**
+
+1. Validate account, user role, category, currency.
+2. If recurring, schedule next transaction.
+3. Update Account balance atomically.
+4. Update Ledger and Summary tables.
+5. Emit event for notifications/analytics.
+
+---
+
+## **4. Summary Module**
+
+**Purpose:** Precomputed daily, monthly, and category-based summaries for reporting and fast querying.
+
+**Entities:**
+
+- `DailySummary`
+- `MonthlySummary`
+- `MonthlyCategorySummary`
+
+**Services:**
+
+- `SummaryService`
+
+  - `updateDailySummary(userId, date)`
+  - `updateMonthlySummary(userId, year, month)`
+  - `updateMonthlyCategorySummary(userId, year, month)`
+  - `getSummary(userId, filters)`
+
+**Endpoints:**
+
+- `GET /summary/daily?userId=&date=` → daily summary
+- `GET /summary/monthly?userId=&year=&month=` → monthly summary
+- `GET /summary/category?userId=&year=&month=` → monthly category summary
+
+**Flow:**
+
+1. Trigger updates on transaction create/update/delete.
+2. Use background workers or DB triggers to recompute summaries.
+3. Cache summary results for faster reporting.
+
+---
+
+## **5. Reporting & Payroll Module**
+
+**Purpose:** Generate reports and manage pay slips or payroll.
+
+**Entities:**
+
+- `Payroll / PaySlip`
+
+**Services:**
+
+- `PayrollService`
+
+  - `createPayroll(userId, accountId, periodStart, periodEnd)`
+  - `updatePayroll(payrollId, dto)`
+  - `getPayroll(payrollId)`
+  - `listPayroll(userId?, filters?)`
+
+- `ReportsService`
+
+  - `generateReport(type, filters)` → daily, monthly, account, category, payroll
+
+**Endpoints:**
+
+- `POST /payroll` → create pay slip
+- `PUT /payroll/:id` → update pay slip
+- `GET /payroll/:id` → get pay slip
+- `GET /payroll` → list pay slips
+- `GET /reports?type=&filters=` → generate report
+
+**Flow:**
+
+1. Payroll calculated from transactions during period.
+2. Deduct taxes, deductions, etc.
+3. Generate report using summaries or raw transaction data.
+
+---
+
+## **6. Currency Module**
+
+**Entities:**
+
+- `Currency`
+- `ExchangeRate`
+
+**Services:**
+
+- `CurrencyService`
+
+  - `listCurrencies()`
+
+- `ExchangeRateService`
+
+  - `updateExchangeRate(from, to, rate)`
+  - `getRate(from, to, date?)`
+
+**Endpoints:**
+
+- `GET /currencies` → list currencies
+- `GET /exchange-rates?from=&to=&date=` → get exchange rate
+- `POST /exchange-rates` → update rate
+
+**Flow:**
+
+1. Multi-currency support in transaction module.
+2. Convert transaction amount if currency differs from account.
+3. Keep historical rates for reports.
+
+---
+
+## **7. Ledger & Audit Module**
+
+**Entities:**
+
+- `AccountLedger`
+- `AuditLog`
+
+**Services:**
+
+- `LedgerService`
+
+  - `recordTransaction(transaction)`
+
+- `AuditService`
+
+  - `logChange(entityType, entityId, action, userId, payload)`
+
+**Endpoints:**
+
+- `GET /ledger?accountId=&from=&to=` → get ledger
+- `GET /audit?entityType=&entityId=` → get audit logs
+
+**Flow:**
+
+1. Record ledger entry for every transaction.
+2. Log changes for audit compliance.
+3. Ensure ledger-first approach before updating account balances.
+
+---
+
+## **Implementation Flow for Scalability**
+
+1. **Start with core entities** (AccountType, Currency, Category, Account).
+2. **Implement transaction module**, ensure atomic updates with database transactions.
+3. **Add shared account support** via AccountUserRole.
+4. **Add summary module** for precomputed reports.
+5. **Add payroll and reporting module** for business/employee requirements.
+6. **Integrate currency and exchange rate support**.
+7. **Add ledger and audit logging** for traceability.
+8. **Use background workers** for recurring transactions and summary updates.
+9. **Add caching** for summaries and reports to handle high load.
+10. **Ensure endpoints are modular**, each module has its own controller/service/repository structure.
+
+---
+
+This **modular structure** ensures:
+
+- Each module is **independent**, can scale horizontally.
+- Transactions are **atomic and audited**.
+- Shared accounts are **role- and permission-driven**.
+- Reports are fast via **precomputed summaries**.
+- Multi-currency is **consistent and historical**.
+
+---
+
+I can now make a **visual module-to-entity map with endpoints and service functions** in a **diagram or table**, which will give developers a **clear blueprint for coding**.
+
+Do you want me to create that next?

@@ -22,6 +22,7 @@ import { UserPreferences } from './userPreferences.entity';
 import { UserSecurityQuestion } from './userSecurityQuestion.entity';
 import { PasswordResetLog } from './passwordResetLog.entity';
 import { UserSession } from './userSessions.entity';
+import { Category } from 'src/finance/categories/categories.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -75,6 +76,9 @@ export class User extends BaseEntity {
 
   @OneToOne(() => UserPreferences, (pref) => pref.user, { cascade: true })
   preferences: UserPreferences;
+
+  @OneToMany(() => Category, (category) => category.user)
+  categories: Category[];
 
   // @OneToMany(() => Transactions, (transaction) => transaction.creatorUser)
   // transactions: Transactions[];

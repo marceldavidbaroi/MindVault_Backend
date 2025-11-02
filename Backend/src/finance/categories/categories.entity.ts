@@ -1,0 +1,63 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
+import { User } from 'src/auth/entities/user.entity';
+
+// ✅ Use enums only (remove type alias)
+export enum CategoryType {
+  INCOME = 'income',
+  EXPENSE = 'expense',
+}
+
+export enum CategoryScope {
+  GLOBAL = 'global',
+  BUSINESS = 'business',
+  FAMILY = 'family',
+  INDIVIDUAL = 'individual',
+}
+
+@Entity('categories')
+@Index(['user', 'name', 'scope'], { unique: true })
+export class Category {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  @Index()
+  user?: User; // Only for individual categories
+
+  @Column({ type: 'varchar', length: 50 })
+  name: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'display_name' })
+  displayName?: string;
+
+  @Column({
+    type: 'enum',
+    enum: CategoryType,
+    default: CategoryType.EXPENSE,
+  })
+  type: CategoryType;
+
+  @Column({
+    type: 'enum',
+    enum: CategoryScope,
+    default: CategoryScope.GLOBAL,
+    name: 'scope',
+  })
+  scope: CategoryScope;
+
+  @CreateDateColumn({ type: 'timestamp with time zone', name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
+  updatedAt: Date;
+}

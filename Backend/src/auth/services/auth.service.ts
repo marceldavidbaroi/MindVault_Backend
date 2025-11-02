@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -99,11 +100,16 @@ export class AuthService {
     const { username, password } = authCredentialsDto;
 
     const user = await this.userRepository.findOne({ where: { username } });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    if (!user) {
+      throw new BadRequestException('Invalid username or password');
+    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid)
-      throw new UnauthorizedException('Invalid credentials');
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Invalid username or password');
+    }
 
     const payload: JwtPayload = { sub: user.id, username };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });

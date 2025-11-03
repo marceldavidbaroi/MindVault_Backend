@@ -21,7 +21,8 @@
     "migration:generate": "typeorm-ts-node-esm migration:generate ./src/migrations/migrationName -d ./src/config/typeorm.datasource.ts",
     "migration:run": "typeorm-ts-node-esm migration:run -d ./src/config/typeorm.datasource.ts",
     "migration:revert": "typeorm-ts-node-esm migration:revert -d ./src/config/typeorm.datasource.ts",
-    "seed:categories": "ts-node -r tsconfig-paths/register src/main.ts categories:run"
+    "seed:categories": "ts-node -r tsconfig-paths/register src/main.ts categories:run",
+    "seed:roles": "ts-node -r tsconfig-paths/register src/main.ts roles:run"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

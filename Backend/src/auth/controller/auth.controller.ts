@@ -15,13 +15,28 @@ import { User } from '../entities/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import type { ApiResponse } from 'src/common/types/api-response.type';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse as SwaggerApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+  ApiCookieAuth,
+} from '@nestjs/swagger';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   // ------------------- SIGNUP -------------------
   @Post('/signup')
+  @ApiOperation({ summary: 'Register a new user' })
+  @SwaggerApiResponse({
+    status: 201,
+    description: 'User registered successfully',
+  })
+  @ApiBody({ type: authCredentialsDto })
   async signUp(@Body() dto: authCredentialsDto): Promise<ApiResponse<null>> {
     const result = await this.authService.signup(dto);
     return {
@@ -33,6 +48,13 @@ export class AuthController {
 
   // ------------------- SIGNIN -------------------
   @Post('/signin')
+  @ApiOperation({ summary: 'Login user and set authentication cookies' })
+  @SwaggerApiResponse({
+    status: 200,
+    description: 'User signed in successfully',
+    type: User,
+  })
+  @ApiBody({ type: SigninDto })
   async signIn(
     @Body() dto: SigninDto,
     @Res({ passthrough: true }) res: Response,
@@ -55,6 +77,12 @@ export class AuthController {
 
   // ------------------- REFRESH TOKEN -------------------
   @Post('/refresh')
+  @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  @SwaggerApiResponse({
+    status: 200,
+    description: 'Access token refreshed successfully',
+  })
+  @ApiCookieAuth('refreshToken')
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -73,6 +101,13 @@ export class AuthController {
   // ------------------- LOGOUT -------------------
   @Post('/logout')
   @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Logout user and clear cookies' })
+  @SwaggerApiResponse({
+    status: 200,
+    description: 'User logged out successfully',
+  })
+  @ApiBearerAuth()
+  @ApiCookieAuth('refreshToken')
   async logout(
     @GetUser() user: User,
     @Req() req: Request,

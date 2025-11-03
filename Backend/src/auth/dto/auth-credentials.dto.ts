@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class authCredentialsDto {
   @ApiProperty({
     description: 'Username of the user (3–20 characters)',
-    example: 'DavidDev',
+    example: 'david',
   })
   @IsString()
   @MinLength(3, { message: 'Username must be at least 3 characters' })
@@ -14,7 +14,7 @@ export class authCredentialsDto {
   @ApiProperty({
     description:
       'Strong password (must contain uppercase, lowercase, number, and special character)',
-    example: 'StrongPass@123',
+    example: 'David@123',
   })
   @IsString()
   @MinLength(6, { message: 'Password must be at least 6 characters' })

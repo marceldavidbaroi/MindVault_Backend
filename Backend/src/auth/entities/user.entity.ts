@@ -23,6 +23,8 @@ import { UserSecurityQuestion } from './userSecurityQuestion.entity';
 import { PasswordResetLog } from './passwordResetLog.entity';
 import { UserSession } from './userSessions.entity';
 import { Category } from 'src/finance/categories/categories.entity';
+import { Account } from 'src/finance/accounts/entity/account.entity';
+import { AccountUserRole } from 'src/finance/accounts/entity/account-user-role.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -79,6 +81,11 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Category, (category) => category.user)
   categories: Category[];
+  @OneToMany(() => Account, (account) => account.owner)
+  accounts: Account[];
+
+  @OneToMany(() => AccountUserRole, (accountRole) => accountRole.user)
+  accountRoles: AccountUserRole[];
 
   // @OneToMany(() => Transactions, (transaction) => transaction.creatorUser)
   // transactions: Transactions[];

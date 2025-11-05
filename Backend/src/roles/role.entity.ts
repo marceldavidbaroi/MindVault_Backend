@@ -1,3 +1,4 @@
+import { AccountUserRole } from 'src/finance/accounts/entity/account-user-role.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -5,6 +6,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  OneToOne,
+  OneToMany,
 } from 'typeorm';
 
 @Entity('roles')
@@ -32,4 +35,7 @@ export class Role {
 
   @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => AccountUserRole, (accountUserRole) => accountUserRole.role)
+  accountUserRoles: AccountUserRole[];
 }

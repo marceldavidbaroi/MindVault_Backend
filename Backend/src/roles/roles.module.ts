@@ -7,9 +7,12 @@ import { Role } from './role.entity';
 import { RolesSeeder } from './roles.seeder';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Role])],
+  imports: [TypeOrmModule.forFeature([Role])], // Role repository provided here
   providers: [RolesSeeder, RolesService],
   controllers: [RolesController],
-  exports: [RolesService],
+  exports: [
+    RolesService,
+    TypeOrmModule, // ✅ export so other modules can inject RoleRepository
+  ],
 })
 export class RolesModule {}

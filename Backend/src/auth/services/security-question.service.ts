@@ -8,41 +8,43 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { UserSecurityQuestion } from '../entities/userSecurityQuestion.entity';
+import { VerifyUserService } from './verify-user.service';
 
 @Injectable()
 export class SecurityQuestionService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly verifyUserService: VerifyUserService,
     @InjectRepository(UserSecurityQuestion)
     private readonly questionsRepository: Repository<UserSecurityQuestion>,
   ) {}
 
   // ------------------- PASSWORD VERIFICATION -------------------
-  private async verifyPassword(user: User, password: string): Promise<void> {
-    const currentUser = await this.userRepository.findOne({
-      where: { id: user.id },
-    });
-    if (!currentUser) throw new NotFoundException('User not found');
+  private async verifyPassword(
+    userId: number,
+    password: string,
+  ): Promise<void> {
+    const currentUser = await this.verifyUserService.verify(userId);
 
     const isMatch = await bcrypt.compare(password, currentUser.password);
     if (!isMatch) throw new BadRequestException('Invalid password');
   }
 
   // ------------------- SECURITY QUESTIONS -------------------
-
-  async getSecurityQuestions(user: User): Promise<UserSecurityQuestion[]> {
-    return this.questionsRepository.find({ where: { user: { id: user.id } } });
+  async getSecurityQuestions(userId: number): Promise<UserSecurityQuestion[]> {
+    await this.verifyUserService.verify(userId);
+    return this.questionsRepository.find({ where: { user: { id: userId } } });
   }
 
-  // Create a new security question
   async createSecurityQuestion(
-    user: User,
+    userId: number,
     question: string,
     answer: string,
     password: string,
   ): Promise<any> {
-    await this.verifyPassword(user, password);
+    const user = await this.verifyUserService.verify(userId);
+    await this.verifyPassword(user.id, password);
 
     const count = await this.questionsRepository.count({
       where: { user: { id: user.id } },
@@ -56,10 +58,8 @@ export class SecurityQuestionService {
       question,
       answerHash: hashedAnswer,
     });
-
     const saved = await this.questionsRepository.save(newQuestion);
 
-    // ✅ Ensure user.hasSecurityQuestions = true
     if (!user.hasSecurityQuestions) {
       user.hasSecurityQuestions = true;
       await this.userRepository.save(user);
@@ -75,18 +75,17 @@ export class SecurityQuestionService {
     };
   }
 
-  // Update an existing security question
   async updateSecurityQuestion(
-    user: User,
+    userId: number,
     questionId: number,
     question: string,
     answer: string,
     password: string,
   ): Promise<UserSecurityQuestion> {
-    await this.verifyPassword(user, password);
+    await this.verifyPassword(userId, password);
 
     const questionEntity = await this.questionsRepository.findOne({
-      where: { id: questionId, user: { id: user.id } },
+      where: { id: questionId, user: { id: userId } },
     });
     if (!questionEntity) throw new NotFoundException('Question not found');
 
@@ -95,29 +94,29 @@ export class SecurityQuestionService {
     return this.questionsRepository.save(questionEntity);
   }
 
-  // Delete a security question
   async deleteSecurityQuestion(
-    user: User,
+    userId: number,
     questionId: number,
     password: string,
   ): Promise<void> {
-    await this.verifyPassword(user, password);
+    await this.verifyPassword(userId, password);
 
     const questionEntity = await this.questionsRepository.findOne({
-      where: { id: questionId, user: { id: user.id } },
+      where: { id: questionId, user: { id: userId } },
     });
     if (!questionEntity) throw new NotFoundException('Question not found');
 
     await this.questionsRepository.remove(questionEntity);
 
-    // ✅ After deletion, check remaining count
     const remaining = await this.questionsRepository.count({
-      where: { user: { id: user.id } },
+      where: { user: { id: userId } },
     });
-
-    if (remaining === 0 && user.hasSecurityQuestions) {
-      user.hasSecurityQuestions = false;
-      await this.userRepository.save(user);
+    if (remaining === 0) {
+      const user = await this.verifyUserService.verify(userId);
+      if (user.hasSecurityQuestions) {
+        user.hasSecurityQuestions = false;
+        await this.userRepository.save(user);
+      }
     }
   }
 }

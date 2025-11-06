@@ -24,6 +24,14 @@ export class PasskeyService {
   private async findUser(user: User): Promise<User> {
     const currentUser = await this.userRepository.findOne({
       where: { id: user.id },
+      select: [
+        'id',
+        'username',
+        'password',
+        'passkey',
+        'passkeyExpiresAt',
+        'refreshToken',
+      ],
     });
     if (!currentUser) throw new NotFoundException('User not found');
     return currentUser;
@@ -68,6 +76,14 @@ export class PasskeyService {
     // Find user by username
     const currentUser = await this.userRepository.findOne({
       where: { username },
+      select: [
+        'id',
+        'username',
+        'password',
+        'passkey',
+        'passkeyExpiresAt',
+        'refreshToken',
+      ],
     });
 
     if (!currentUser) {

@@ -34,10 +34,6 @@ export class Account {
   @Column({ type: 'decimal', precision: 15, scale: 2, name: 'initial_balance' })
   initialBalance: number;
 
-  @ApiProperty({ example: 1, description: 'Account type ID' })
-  @Column({ type: 'int', name: 'type_id' })
-  typeId: number;
-
   @ManyToOne(() => AccountType, (type) => type.accounts)
   @JoinColumn({ name: 'type_id' })
   type: AccountType;

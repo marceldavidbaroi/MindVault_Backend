@@ -1,24 +1,23 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { User } from '../entities/user.entity';
 import { UserSecurityQuestion } from '../entities/userSecurityQuestion.entity';
 import { PasswordResetLog } from '../entities/passwordResetLog.entity';
 import { generatePasskey } from '../utils/passkey.util';
+import { VerifyUserService } from './verify-user.service';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { User } from '../entities/user.entity';
 
 @Injectable()
 export class ForgotPasswordService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly verifyUserService: VerifyUserService,
 
     @InjectRepository(UserSecurityQuestion)
     private readonly questionsRepository: Repository<UserSecurityQuestion>,
+
     @InjectRepository(PasswordResetLog)
     private readonly resetLogRepository: Repository<PasswordResetLog>,
   ) {}
@@ -27,12 +26,12 @@ export class ForgotPasswordService {
   async fetchForgotQuestions(
     username: string,
   ): Promise<{ id: number; question: string }[]> {
-    const user = await this.userRepository.findOne({ where: { username } });
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.verifyUserService.verify(username);
 
     const questions = await this.questionsRepository.find({
       where: { user: { id: user.id } },
     });
+
     return questions.map((q) => ({ id: q.id, question: q.question }));
   }
 
@@ -41,8 +40,7 @@ export class ForgotPasswordService {
     answers: { questionId: number; answer: string }[],
     newPassword: string,
   ): Promise<{ message: string; newPasskey: string }> {
-    const user = await this.userRepository.findOne({ where: { username } });
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.verifyUserService.verify(username);
 
     const questions = await this.questionsRepository.find({
       where: { user: { id: user.id } },
@@ -51,19 +49,20 @@ export class ForgotPasswordService {
     for (const ans of answers) {
       const q = questions.find((q) => q.id === ans.questionId);
       if (!q) throw new BadRequestException('Invalid question ID');
+
       const match = await bcrypt.compare(ans.answer, q.answerHash);
       if (!match)
         throw new BadRequestException('Incorrect answer for a question');
     }
 
-    // All correct, reset password
+    // ✅ All correct, reset password
     user.password = await bcrypt.hash(newPassword, 10);
     const newPasskey = generatePasskey();
     user.passkey = newPasskey;
     user.passkeyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     user.refreshToken = undefined;
 
-    await this.userRepository.save(user);
+    await this.userRepository.save(user); // or user.save() if using ActiveRecord
 
     // Log reset
     const resetLog = this.resetLogRepository.create({

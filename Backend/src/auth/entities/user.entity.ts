@@ -25,6 +25,7 @@ import { UserSession } from './userSessions.entity';
 import { Category } from 'src/finance/categories/categories.entity';
 import { Account } from 'src/finance/accounts/entity/account.entity';
 import { AccountUserRole } from 'src/finance/accounts/entity/account-user-role.entity';
+import { Transaction } from 'src/finance/transactions/entities/transaction.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -37,32 +38,46 @@ export class User extends BaseEntity {
   @Column({ unique: true, nullable: true })
   username: string;
 
-  @Column()
+  @Column({ select: false })
   password: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, select: false })
   refreshToken?: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, select: false })
   passkey?: string;
 
   @Column({
     type: 'timestamp with time zone',
     nullable: true,
     name: 'passkey_expires_at',
+    select: false,
   })
   passkeyExpiresAt?: Date;
 
-  @Column({ type: 'boolean', default: false, name: 'has_security_questions' })
+  @Column({
+    type: 'boolean',
+    default: false,
+    name: 'has_security_questions',
+    select: false,
+  })
   hasSecurityQuestions: boolean;
 
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
 
-  @CreateDateColumn({ type: 'timestamp with time zone', name: 'created_at' })
+  @CreateDateColumn({
+    type: 'timestamp with time zone',
+    name: 'created_at',
+    select: false,
+  })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
+  @UpdateDateColumn({
+    type: 'timestamp with time zone',
+    name: 'updated_at',
+    select: false,
+  })
   updatedAt: Date;
 
   // relations
@@ -87,36 +102,6 @@ export class User extends BaseEntity {
   @OneToMany(() => AccountUserRole, (accountRole) => accountRole.user)
   accountRoles: AccountUserRole[];
 
-  // @OneToMany(() => Transactions, (transaction) => transaction.creatorUser)
-  // transactions: Transactions[];
-
-  // @OneToMany(() => Budgets, (budget) => budget.user)
-  // budgets: Budgets[];
-
-  // @OneToMany(() => SavingsGoals, (savingsGoal) => savingsGoal.user)
-  // savingsGoals: SavingsGoals[];
-
-  // @OneToMany(() => Reports, (report) => report.user)
-  // reports: Reports[];
-
-  // @OneToMany(() => Category, (categories) => categories.user)
-  // categories: Category[];
-
-  // @OneToMany(() => DailySummary, (daily_summary) => daily_summary.user)
-  // dailySummaries: DailySummary[];
-
-  // @OneToMany(() => MonthlySummary, (monthly_summary) => monthly_summary.user)
-  // monthlySummaries: MonthlySummary[];
-
-  // @OneToMany(
-  //   () => MonthlyCategorySummary,
-  //   (monthly_category_summary) => monthly_category_summary.user,
-  // )
-  // monthlyCategorySummaries: MonthlyCategorySummary[];
-
-  // @OneToMany(() => AccountType, (account_type) => account_type.user)
-  // accountTypes: AccountType[];
-
-  // @OneToMany(() => Account, (account) => account.ownerUser)
-  // accounts: AccountType[];
+  @OneToMany(() => Transaction, (transaction) => transaction.creatorUser)
+  transactions: Transaction[];
 }

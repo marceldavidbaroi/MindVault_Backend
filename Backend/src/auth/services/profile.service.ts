@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserPreferences } from '../entities/userPreferences.entity';
 import { UserSecurityQuestion } from '../entities/userSecurityQuestion.entity';
 import { PasswordResetLog } from '../entities/passwordResetLog.entity';
+import { VerifyUserService } from './verify-user.service';
 
 interface FrontendPreferences {
   theme?: 'light' | 'dark';
@@ -22,33 +23,29 @@ export class ProfileService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly verifyUserService: VerifyUserService,
     @InjectRepository(UserPreferences)
     private readonly preferencesRepository: Repository<UserPreferences>,
   ) {}
 
-  // ------------------- PRIVATE HELPER -------------------
-  private async findUser(userId: number): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['preferences'],
-    });
-    if (!user) throw new NotFoundException('User not found');
-    return user;
-  }
-
   // ------------------- PROFILE -------------------
   async getProfile(user: User) {
-    const currentUser = await this.findUser(user.id);
+    const currentUser = await this.verifyUserService.verify(user.id);
+
     const { password, refreshToken, passkey, ...safeUser } = currentUser;
+    const preferences = currentUser.preferences || {
+      frontend: {},
+      backend: {},
+    };
 
     return {
       ...safeUser,
-      preferences: user.preferences || { frontend: {}, backend: {} },
+      preferences,
     };
   }
 
   async updateProfile(user: User, updateData: Partial<User>) {
-    const currentUser = await this.findUser(user.id);
+    const currentUser = await this.verifyUserService.verify(user.id);
     Object.assign(currentUser, updateData);
     await this.userRepository.save(currentUser);
 
@@ -63,12 +60,12 @@ export class ProfileService {
       backend?: BackendPreferences;
     },
   ) {
-    const currentUser = await this.findUser(user.id);
+    const currentUser = await this.verifyUserService.verify(user.id);
 
     let prefs = currentUser.preferences;
     if (!prefs) {
       prefs = this.preferencesRepository.create({
-        user,
+        user: currentUser,
         frontend: {},
         backend: {},
       });

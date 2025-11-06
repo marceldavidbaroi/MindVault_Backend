@@ -120,4 +120,10 @@ export class CategoriesService {
 
     return qb.getMany();
   }
+
+  async verifyCategory(id: number): Promise<Category> {
+    const category = await this.categoryRepo.findOne({ where: { id } });
+    if (!category) throw new BadRequestException('Invalid categoryId');
+    return category;
+  }
 }

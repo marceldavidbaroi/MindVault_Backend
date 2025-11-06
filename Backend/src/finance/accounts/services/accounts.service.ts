@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,12 +11,15 @@ import { Account } from '../entity/account.entity';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
 import { User } from 'src/auth/entities/user.entity';
+import { AccountUserRolesService } from './account-user-roles.service.service';
 
 @Injectable()
 export class AccountsService {
   constructor(
     @InjectRepository(Account)
     private readonly accountRepo: Repository<Account>,
+    @Inject(forwardRef(() => AccountUserRolesService))
+    private readonly accountUserRolesService: AccountUserRolesService,
   ) {}
 
   async createAccount(user: User, dto: CreateAccountDto): Promise<Account> {
@@ -22,10 +27,19 @@ export class AccountsService {
       name: dto.name,
       description: dto.description,
       initialBalance: dto.initialBalance,
-      type: { id: dto.accountTypeId }, // TypeORM will handle this
+      type: { id: dto.accountTypeId },
       ownerId: user.id,
     });
-    return await this.accountRepo.save(account);
+    const savedAccount = await this.accountRepo.save(account);
+    const data = await this.accountUserRolesService.assignRole(
+      savedAccount.id,
+      {
+        userId: user.id,
+        roleId: 1,
+      },
+    );
+
+    return savedAccount;
   }
 
   async updateAccount(

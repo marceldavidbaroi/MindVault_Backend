@@ -53,7 +53,7 @@ export class SecurityQuestionController {
   async getSecurityQuestions(
     @GetUser() user: User,
   ): Promise<ApiResponseType<any[]>> {
-    const questions = await this.service.getSecurityQuestions(user);
+    const questions = await this.service.getSecurityQuestions(user.id);
     return {
       success: true,
       message: 'Security questions fetched successfully',
@@ -84,7 +84,7 @@ export class SecurityQuestionController {
     @Body() body: CreateSecurityQuestionDto,
   ): Promise<ApiResponseType<any>> {
     const question = await this.service.createSecurityQuestion(
-      user,
+      user.id,
       body.question,
       body.answer,
       body.password,
@@ -125,7 +125,7 @@ export class SecurityQuestionController {
     @Body() body: CreateSecurityQuestionDto,
   ): Promise<ApiResponseType<any>> {
     const updated = await this.service.updateSecurityQuestion(
-      user,
+      user.id,
       id,
       body.question,
       body.answer,
@@ -163,7 +163,7 @@ export class SecurityQuestionController {
     @Param('id') id: number,
     @Body() dto: DeleteSecurityQuestionDto,
   ): Promise<ApiResponseType<null>> {
-    await this.service.deleteSecurityQuestion(user, id, dto.password);
+    await this.service.deleteSecurityQuestion(user.id, id, dto.password);
     return {
       success: true,
       message: 'Security question deleted successfully',

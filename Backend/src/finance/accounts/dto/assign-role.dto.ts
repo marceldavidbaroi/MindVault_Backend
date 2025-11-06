@@ -1,6 +1,6 @@
 // assign-role.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsString } from 'class-validator';
+import { IsInt } from 'class-validator';
 
 export class AssignRoleDto {
   @ApiProperty({ example: 2, description: 'User ID to assign the role to' })

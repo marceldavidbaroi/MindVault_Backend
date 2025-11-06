@@ -3,7 +3,6 @@ import {
   ConflictException,
   InternalServerErrorException,
   UnauthorizedException,
-  NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,36 +16,26 @@ import { UserPreferences } from '../entities/userPreferences.entity';
 import { authCredentialsDto } from '../dto/auth-credentials.dto';
 import { SigninDto } from '../dto/sign-in.dto';
 import { generatePasskey } from '../utils/passkey.util';
+import { VerifyUserService } from './verify-user.service';
 
 export interface JwtPayload {
   sub: number;
   email?: string;
   username: string;
-  exp?: number; // ✅ add this
-  iat?: number; // ✅ add this
+  exp?: number;
+  iat?: number;
 }
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
     @InjectRepository(UserPreferences)
     private readonly preferencesRepository: Repository<UserPreferences>,
     @InjectRepository(UserSession)
     private readonly userSessionRepository: Repository<UserSession>,
     private readonly jwtService: JwtService,
+    private readonly verifyUserService: VerifyUserService, // ✅ inject service
   ) {}
-
-  // ------------------- PRIVATE HELPERS -------------------
-  private async findUser(userId: number): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['preferences'],
-    });
-    if (!user) throw new NotFoundException('User not found');
-    return user;
-  }
 
   private async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 10);
@@ -58,24 +47,23 @@ export class AuthService {
   ): Promise<{ message: string; passkey: string }> {
     const { username, password } = authCredentialsDto;
 
-    const existingUser = await this.userRepository.findOne({
-      where: { username },
-    });
+    const existingUser = await this.verifyUserService
+      .verify(username)
+      .catch(() => null);
     if (existingUser) throw new ConflictException('Username already exists');
 
     const hashedPassword = await this.hashPassword(password);
     const passkey = generatePasskey();
 
-    const user = this.userRepository.create({
-      username,
-      password: hashedPassword,
-      passkey,
-      passkeyExpiresAt: undefined,
-      isActive: true,
-    });
+    const user = new User();
+    user.username = username;
+    user.password = hashedPassword;
+    user.passkey = passkey;
+    user.passkeyExpiresAt = undefined;
+    user.isActive = true;
 
     try {
-      await this.userRepository.save(user);
+      await user.save();
 
       const preferences = this.preferencesRepository.create({
         user,
@@ -99,17 +87,12 @@ export class AuthService {
   ): Promise<{ user: Partial<User> }> {
     const { username, password } = authCredentialsDto;
 
-    const user = await this.userRepository.findOne({ where: { username } });
-
-    if (!user) {
-      throw new BadRequestException('Invalid username or password');
-    }
+    // ✅ Use VerifyUserService to fetch user with password
+    const user = await this.verifyUserService.verify(username);
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
+    if (!isPasswordValid)
       throw new BadRequestException('Invalid username or password');
-    }
 
     const payload: JwtPayload = { sub: user.id, username };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
@@ -121,7 +104,7 @@ export class AuthService {
       refreshToken: await bcrypt.hash(refreshToken, 10),
       userAgent,
       ipAddress,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
     await this.userSessionRepository.save(session);
 
@@ -143,10 +126,7 @@ export class AuthService {
   }
 
   // ------------------- REFRESH TOKEN -------------------
-  async refreshAccessToken(
-    refreshToken: string,
-    res: Response,
-  ): Promise<{ accessToken: string }> {
+  async refreshAccessToken(refreshToken: string, res: Response) {
     if (!refreshToken)
       throw new UnauthorizedException('No refresh token provided');
 
@@ -157,8 +137,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    // ✅ Use VerifyUserService
+    const user = await this.verifyUserService.verify(payload.sub);
+
     const session = await this.userSessionRepository.findOne({
-      where: { user: { id: Number(payload.sub) } },
+      where: { user: { id: user.id } },
     });
 
     if (
@@ -168,7 +151,6 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token invalid or expired');
     }
 
-    // ✅ Remove exp and iat before re-signing
     const { exp, iat, ...cleanPayload } = payload;
 
     const newAccessToken = this.jwtService.sign(cleanPayload, {

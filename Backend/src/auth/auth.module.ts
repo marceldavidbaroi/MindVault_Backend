@@ -19,6 +19,7 @@ import { UserPreferences } from './entities/userPreferences.entity';
 import { UserSession } from './entities/userSessions.entity';
 import { PasswordResetLog } from './entities/passwordResetLog.entity';
 import { UserSecurityQuestion } from './entities/userSecurityQuestion.entity';
+import { VerifyUserService } from './services/verify-user.service';
 
 @Module({
   imports: [
@@ -46,11 +47,11 @@ import { UserSecurityQuestion } from './entities/userSecurityQuestion.entity';
     AuthService,
     ForgotPasswordService,
     PasskeyService,
-    PasskeyService,
     ProfileService,
     SecurityQuestionService,
     JwtStrategy,
+    VerifyUserService,
   ],
-  exports: [PassportModule, JwtStrategy],
+  exports: [PassportModule, JwtStrategy, VerifyUserService],
 })
 export class AuthModule {}

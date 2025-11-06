@@ -7,8 +7,10 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
+  OneToMany,
 } from 'typeorm';
 import { User } from 'src/auth/entities/user.entity';
+import { Transaction } from '../transactions/entities/transaction.entity';
 
 // ✅ Use enums only (remove type alias)
 export enum CategoryType {
@@ -60,4 +62,7 @@ export class Category {
 
   @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => Transaction, (transaction) => transaction.category)
+  transactions: Transaction[];
 }

@@ -8,19 +8,14 @@ import {
   UpdateDateColumn,
   Index,
   OneToOne,
+  Unique,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from 'src/auth/entities/user.entity';
 import { Account } from './account.entity';
 import { Role } from 'src/roles/role.entity';
 
-// export enum AccountUserRoleType {
-//   OWNER = 'owner',
-//   EDITOR = 'editor',
-//   VIEWER = 'viewer',
-// }
-
-@Index(['accountId', 'userId'], { unique: true })
+@Unique(['account', 'user'])
 @Entity('account_user_roles')
 export class AccountUserRole {
   @ApiProperty({
@@ -30,19 +25,11 @@ export class AccountUserRole {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ApiProperty({ example: 1, description: 'Account ID' })
-  @Column({ type: 'int', name: 'account_id' })
-  accountId: number;
-
   @ManyToOne(() => Account, (account) => account.userRoles, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'account_id' })
   account: Account;
-
-  @ApiProperty({ example: 2, description: 'User ID' })
-  @Column({ type: 'int', name: 'user_id' })
-  userId: number;
 
   @ManyToOne(() => User, (user) => user.accountRoles, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })

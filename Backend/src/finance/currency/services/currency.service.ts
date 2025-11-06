@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Currency } from '../entity/currency.entity';
@@ -12,5 +12,11 @@ export class CurrencyService {
 
   async listCurrencies(): Promise<Currency[]> {
     return this.currencyRepo.find();
+  }
+
+  async verifyCurrency(code: string): Promise<Currency> {
+    const currency = await this.currencyRepo.findOne({ where: { code } });
+    if (!currency) throw new BadRequestException('Invalid currency code');
+    return currency;
   }
 }

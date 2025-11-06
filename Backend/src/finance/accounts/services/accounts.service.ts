@@ -32,6 +32,7 @@ export class AccountsService {
     });
     const savedAccount = await this.accountRepo.save(account);
     const data = await this.accountUserRolesService.assignRole(
+      user,
       savedAccount.id,
       {
         userId: user.id,

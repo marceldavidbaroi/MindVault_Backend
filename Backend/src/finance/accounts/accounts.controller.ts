@@ -57,6 +57,39 @@ export class AccountsController {
     return { success: true, message: 'Account created', data: account };
   }
 
+  @Get('/my')
+  @ApiOperation({ summary: 'List accounts for the current user' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Accounts fetched successfully.',
+  })
+  async listAccounts(@GetUser() user: User): Promise<ApiResponse<Account[]>> {
+    const accounts = await this.accountsService.listAccounts(user);
+    return { success: true, message: 'Accounts fetched', data: accounts };
+  }
+
+  @Get('/access')
+  @ApiOperation({ summary: 'List accounts for the current user with roles' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Accounts with roles fetched successfully.',
+  })
+  async getUserAccountsWithRoles(
+    @GetUser() user: User,
+  ): Promise<ApiResponse<any[]>> {
+    // Fetch all roles for the current user
+    const roles =
+      await this.accountUserRolesService.getUserAccountsWithRoles(user);
+
+    // Map to a cleaner structure for frontend: each account with its role
+
+    return {
+      success: true,
+      message: 'Accounts with roles fetched',
+      data: roles,
+    };
+  }
+
   @Put(':id')
   @ApiOperation({ summary: 'Update an account' })
   @SwaggerResponse({
@@ -100,17 +133,6 @@ export class AccountsController {
     return { success: true, message: 'Account fetched', data: account };
   }
 
-  @Get()
-  @ApiOperation({ summary: 'List accounts for the current user' })
-  @SwaggerResponse({
-    status: 200,
-    description: 'Accounts fetched successfully.',
-  })
-  async listAccounts(@GetUser() user: User): Promise<ApiResponse<Account[]>> {
-    const accounts = await this.accountsService.listAccounts(user);
-    return { success: true, message: 'Accounts fetched', data: accounts };
-  }
-
   // --------- Account Types ---------
 
   @Get('/types/all')
@@ -130,10 +152,15 @@ export class AccountsController {
   @ApiOperation({ summary: 'Assign a role to a user for an account' })
   @SwaggerResponse({ status: 201, description: 'Role assigned successfully.' })
   async assignRole(
+    @GetUser() user: User,
     @Param('id', ParseIntPipe) accountId: number,
     @Body() dto: AssignRoleDto,
   ): Promise<ApiResponse<AccountUserRole>> {
-    const role = await this.accountUserRolesService.assignRole(accountId, dto);
+    const role = await this.accountUserRolesService.assignRole(
+      user,
+      accountId,
+      dto,
+    );
     return { success: true, message: 'Role assigned', data: role };
   }
 

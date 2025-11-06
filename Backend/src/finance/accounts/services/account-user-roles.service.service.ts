@@ -15,6 +15,7 @@ import { plainToInstance } from 'class-transformer';
 import { VerifyUserService } from 'src/auth/services/verify-user.service';
 import { AccountsService } from './accounts.service';
 import { RolesService } from 'src/roles/roles.service';
+import { User } from 'src/auth/entities/user.entity';
 
 @Injectable()
 export class AccountUserRolesService {
@@ -45,13 +46,14 @@ export class AccountUserRolesService {
 
   /** Assign a role to a user for an account */
   async assignRole(
+    owner: User,
     accountId: number,
     dto: AssignRoleDto,
   ): Promise<AccountUserRole> {
     console.log('this is called');
     const role = await this.rolesService.findOne(dto.roleId);
     const user = await this.verifyUserService.verify(dto.userId);
-    const account = await this.accountsService.getAccount(accountId, user);
+    const account = await this.accountsService.getAccount(accountId, owner);
 
     const accountUserRole = this.roleRepo.create({
       account,
@@ -89,9 +91,18 @@ export class AccountUserRolesService {
       relations: ['role', 'user'],
     });
     return roles;
+  }
 
-    // return plainToInstance(AccountUserRoleDto, roles, {
-    //   excludeExtraneousValues: true,
-    // });
+  async getUserAccountsWithRoles(user: User): Promise<AccountUserRole[]> {
+    // Ensure the user exists
+    await this.verifyUserService.verify(user.id);
+
+    // Find all roles for this user across all accounts
+    const roles = await this.roleRepo.find({
+      where: { user: { id: user.id } },
+      relations: ['role', 'account'], // include account and role details
+    });
+
+    return roles; // each item contains { user, account, role }
   }
 }

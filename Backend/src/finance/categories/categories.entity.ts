@@ -11,6 +11,8 @@ import {
 } from 'typeorm';
 import { User } from 'src/auth/entities/user.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
+import { MonthlyCategorySummary } from '../summary/entity/monthly-category-summary.entity';
+import { MonthlySummary } from '../summary/entity/monthly-summary.entity';
 
 // ✅ Use enums only (remove type alias)
 export enum CategoryType {
@@ -65,4 +67,10 @@ export class Category {
 
   @OneToMany(() => Transaction, (transaction) => transaction.category)
   transactions: Transaction[];
+
+  @OneToMany(
+    () => MonthlyCategorySummary,
+    (monthlyCategorySummary) => monthlyCategorySummary.category,
+  )
+  monthlyCategorySummary: Category[];
 }

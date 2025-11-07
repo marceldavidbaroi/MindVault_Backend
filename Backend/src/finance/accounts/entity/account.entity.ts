@@ -12,6 +12,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { User } from 'src/auth/entities/user.entity';
 import { AccountType } from './account-type.entity';
 import { AccountUserRole } from './account-user-role.entity';
+import { DailySummary } from 'src/finance/summary/entity/daily-summary.entity';
+import { MonthlySummary } from 'src/finance/summary/entity/monthly-summary.entity';
+import { MonthlyCategorySummary } from 'src/finance/summary/entity/monthly-category-summary.entity';
 
 @Entity('accounts')
 export class Account {
@@ -64,4 +67,16 @@ export class Account {
 
   @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => DailySummary, (dailySummary) => dailySummary.account)
+  dailySummary: DailySummary[];
+
+  @OneToMany(() => MonthlySummary, (monthlySummary) => monthlySummary.account)
+  monthlySummary: MonthlySummary[];
+
+  @OneToMany(
+    () => MonthlyCategorySummary,
+    (monthlyCategorySummary) => monthlyCategorySummary.account,
+  )
+  monthlyCategorySummary: MonthlyCategorySummary[];
 }

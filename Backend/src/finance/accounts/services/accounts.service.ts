@@ -61,8 +61,21 @@ export class AccountsService {
     return await this.getAccountByIdAndUser(id, user);
   }
 
-  async listAccounts(user: User): Promise<Account[]> {
-    return await this.accountRepo.find({ where: { ownerId: user.id } });
+  async listAccounts(user: User): Promise<any[]> {
+    const qb = this.accountRepo
+      .createQueryBuilder('account')
+      .leftJoin('account.type', 'type')
+      .select([
+        'account.id',
+        'account.name',
+        'account.balance', // include any scalar fields you want
+        'type.id',
+        'type.name',
+      ])
+      .where('account.ownerId = :ownerId', { ownerId: user.id });
+
+    const accounts = await qb.getMany();
+    return accounts;
   }
 
   private async getAccountByIdAndUser(
@@ -71,6 +84,7 @@ export class AccountsService {
   ): Promise<Account> {
     const account = await this.accountRepo.findOne({
       where: { id, ownerId: user.id },
+      relations: ['type'],
     });
     if (!account) {
       throw new NotFoundException(

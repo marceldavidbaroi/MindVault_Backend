@@ -3,6 +3,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { CurrencyModule } from './currency/currency.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { SummaryModule } from './summary/summary.module';
 
 @Module({
   imports: [
@@ -10,6 +11,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     CurrencyModule,
     AccountsModule,
     TransactionsModule,
+    SummaryModule,
   ],
 })
 export class FinanceModule {}

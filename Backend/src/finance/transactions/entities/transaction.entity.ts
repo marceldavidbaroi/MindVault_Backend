@@ -43,7 +43,9 @@ export class Transaction {
   @Column({ type: 'decimal', precision: 18, scale: 2 })
   amount: string;
 
-  @ManyToOne(() => Currency, { nullable: true })
+  @ManyToOne(() => Currency, (currency) => currency.transactions, {
+    nullable: true,
+  })
   currency?: Currency;
 
   @Column({ type: 'date', name: 'transaction_date' })

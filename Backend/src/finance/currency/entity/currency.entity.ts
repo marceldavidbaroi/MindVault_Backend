@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ExchangeRate } from './exchange-rate.entity';
+import { Transaction } from 'src/finance/transactions/entities/transaction.entity';
 
 @Entity('currencies')
 export class Currency {
@@ -45,4 +46,7 @@ export class Currency {
 
   @OneToMany(() => ExchangeRate, (rate) => rate.toCurrency)
   toRates: ExchangeRate[];
+
+  @OneToMany(() => Transaction, (transaction) => transaction.currency)
+  transactions: Transaction[];
 }

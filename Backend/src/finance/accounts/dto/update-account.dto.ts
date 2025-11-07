@@ -13,15 +13,6 @@ export class UpdateAccountDto {
   description?: string;
 
   @ApiProperty({
-    example: 2000,
-    description: 'Optional new balance',
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  balance?: number;
-
-  @ApiProperty({
     example: 2,
     description: 'Optional new account type ID',
     required: false,

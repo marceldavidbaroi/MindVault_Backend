@@ -18,6 +18,7 @@ import { CategoriesService } from 'src/finance/categories/categories.service';
 import { AccountsService } from 'src/finance/accounts/services/accounts.service';
 import { AccountUserRolesService } from 'src/finance/accounts/services/account-user-roles.service.service';
 import { ListTransactionsFilterDto } from '../dto/list-transactions.dto';
+import { SummaryWorkerService } from 'src/finance/summary/services/summary-worker.service';
 
 @Injectable()
 export class TransactionService {
@@ -29,6 +30,7 @@ export class TransactionService {
     private readonly categoryService: CategoriesService,
     private readonly dataSource: DataSource,
     private readonly accountUserRolesService: AccountUserRolesService,
+    private readonly summaryWorkerService: SummaryWorkerService,
 
     // NOTE: AccountService is used only to validate the account exists
     private readonly accountService: AccountsService,
@@ -101,6 +103,7 @@ export class TransactionService {
         dto.accountId,
         newBalance.toFixed(2).toString(),
       );
+      await this.summaryWorkerService.handleTransaction(tx);
 
       // ✅ Future-proof: you can update account balance here safely
       // Example:
@@ -128,12 +131,36 @@ export class TransactionService {
   ) {
     const qb = this.transactionRepo
       .createQueryBuilder('t')
-      .leftJoinAndSelect('t.account', 'account')
-      .leftJoinAndSelect('t.creatorUser', 'creator')
-      .leftJoinAndSelect('t.category', 'category')
-      .leftJoinAndSelect('t.currency', 'currency');
+      .leftJoin('t.account', 'account')
+      .leftJoin('t.creatorUser', 'creator')
+      .leftJoin('t.category', 'category')
+      .leftJoin('t.currency', 'currency')
+      .select([
+        // Transaction fields
+        't.id',
+        't.type',
+        't.amount',
+        't.transactionDate',
+        't.description',
+        't.status',
+        't.recurring',
+        't.recurringInterval',
+        't.externalRefId',
+        // 't.createdAt',
+        // 't.updatedAt',
 
-    // Mandatory filter: accountId
+        // Related minimal fields
+        'account.id',
+        'account.name',
+        'category.id',
+        'category.name',
+        'currency.code',
+        'currency.symbol',
+        'creator.id',
+        'creator.username',
+      ]);
+
+    // Mandatory filter
     qb.where('account.id = :accountId', { accountId });
 
     // Optional filters
@@ -163,26 +190,105 @@ export class TransactionService {
 
     const [items, total] = await qb.getManyAndCount();
 
+    // Return clean, lightweight structure
+    const formattedItems = items.map((t) => ({
+      id: t.id,
+      type: t.type,
+      amount: t.amount,
+      transactionDate: t.transactionDate,
+      description: t.description,
+      status: t.status,
+      recurring: t.recurring,
+      recurringInterval: t.recurringInterval,
+      externalRefId: t.externalRefId,
+      // createdAt: t.createdAt,
+      // updatedAt: t.updatedAt,
+      account: t.account ? { id: t.account.id, name: t.account.name } : null,
+      category: t.category
+        ? { id: t.category.id, name: t.category.name }
+        : null,
+      currency: t.currency
+        ? { symbol: t.currency.symbol, code: t.currency.code }
+        : null,
+      creatorUser: t.creatorUser
+        ? { id: t.creatorUser.id, username: t.creatorUser.username }
+        : null,
+    }));
+
     return {
       success: true,
       message: 'OK',
-      data: { items, total, page, pageSize },
+      data: { items: formattedItems, total, page, pageSize },
     };
   }
 
   async updateTransaction(id: number, dto: UpdateTransactionDto) {
-    const tx = await this.transactionRepo.findOne({ where: { id } });
-    if (!tx) return { success: false, message: 'Transaction not found' };
-    const oldTransactionBalance = Number(tx.amount);
-    const accountBalance = Number(await this.accountService.getBalance(id));
-    const newBalance =
-      accountBalance - oldTransactionBalance + Number(dto.amount);
-    await this.accountService.updateBalance(
-      id,
-      newBalance.toFixed(2).toString(),
-    );
-    Object.assign(tx, dto);
+    // Fetch the transaction with necessary relations
+    const tx = await this.transactionRepo.findOne({
+      where: { id },
+      relations: ['account', 'currency', 'creatorUser', 'category'],
+    });
+
+    if (!tx) {
+      return { success: false, message: 'Transaction not found' };
+    }
+
+    const oldTx = { ...tx };
+    const oldTransactionAmount = Number(tx.amount);
+
+    // Update account balance if amount changes
+    if (dto.amount && dto.amount !== tx.amount) {
+      const accountBalance = Number(
+        await this.accountService.getBalance(tx.account.id),
+      );
+      const newBalance =
+        accountBalance - oldTransactionAmount + Number(dto.amount);
+      await this.accountService.updateBalance(
+        tx.account.id,
+        newBalance.toFixed(2).toString(),
+      );
+    }
+
+    // Prevent externalRefId duplicates
+    if (dto.externalRefId && dto.externalRefId !== tx.externalRefId) {
+      const existing = await this.transactionRepo.findOne({
+        where: { externalRefId: dto.externalRefId },
+      });
+      if (existing && existing.id !== id) {
+        return {
+          success: false,
+          message: 'externalRefId already exists',
+        };
+      }
+      tx.externalRefId = dto.externalRefId;
+    }
+
+    // Only update allowed fields
+    const updatableFields = [
+      'amount',
+      'type',
+      'description',
+      'transactionDate',
+      'status',
+      'recurring',
+      'recurringInterval',
+    ];
+    updatableFields.forEach((field) => {
+      if (dto[field] !== undefined) {
+        tx[field] = dto[field];
+      }
+    });
+
+    // Update relations if provided
+    if (dto.accountId) tx.account = { id: dto.accountId } as any;
+    if (dto.categoryId) tx.category = { id: dto.categoryId } as any;
+    if (dto.currencyCode) tx.currency = { code: dto.currencyCode } as any;
+
+    // Save updated transaction
     const updated = await this.transactionRepo.save(tx);
+
+    // Handle summary updates
+    await this.summaryWorkerService.handleTransactionUpdate(oldTx, tx);
 
     return { success: true, message: 'Transaction updated', data: updated };
   }

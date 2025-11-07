@@ -11,6 +11,7 @@ import { AccountsModule } from 'src/finance/accounts/accounts.module';
 import { CurrencyModule } from 'src/finance/currency/currency.module';
 import { CategoriesModule } from 'src/finance/categories/categories.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { SummaryModule } from '../summary/summary.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuthModule } from 'src/auth/auth.module';
     AccountsModule,
     CurrencyModule,
     CategoriesModule,
+    SummaryModule,
 
     AuthModule,
   ],

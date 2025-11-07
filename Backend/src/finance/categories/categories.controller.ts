@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  Patch,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -22,7 +23,7 @@ import {
   ApiResponse as SwaggerResponse,
 } from '@nestjs/swagger';
 import { ApiResponse } from 'src/common/types/api-response.type';
-import { Category } from './categories.entity';
+import { Category, CategoryStats } from './categories.entity';
 import { FilterCategoryDto } from './dto/filter-category.dto';
 
 @ApiTags('Finance Categories')
@@ -45,7 +46,7 @@ export class CategoriesController {
     return { success: true, message: 'Category created', data: category };
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Update a category' })
   @SwaggerResponse({
     status: 200,
@@ -106,5 +107,16 @@ export class CategoriesController {
       scope,
     );
     return { success: true, message: 'Categories fetched', data: categories };
+  }
+
+  @Get('stats/all')
+  @ApiOperation({ summary: 'Get categories statistics/status' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Category statistics fetched successfully.',
+  })
+  async status(@GetUser() user: User): Promise<ApiResponse<CategoryStats>> {
+    const stats = await this.categoriesService.getCategoryStats(user);
+    return { success: true, message: 'Category stats fetched', data: stats };
   }
 }

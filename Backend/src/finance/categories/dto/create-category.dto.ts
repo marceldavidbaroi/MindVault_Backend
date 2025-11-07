@@ -24,14 +24,4 @@ export class CreateCategoryDto {
   })
   @IsEnum(CategoryType)
   type: CategoryType;
-
-  @ApiProperty({
-    description: 'Category ownership scope',
-    enum: CategoryScope,
-    enumName: 'CategoryScope',
-    required: false,
-  })
-  @IsOptional()
-  @IsEnum(CategoryScope)
-  scope?: CategoryScope;
 }

@@ -12,8 +12,19 @@ import {
 import { User } from 'src/auth/entities/user.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
 import { MonthlyCategorySummary } from '../summary/entity/monthly-category-summary.entity';
-import { MonthlySummary } from '../summary/entity/monthly-summary.entity';
-
+export interface CategoryStats {
+  total: number;
+  income: {
+    total: number;
+    system: number;
+    user: number;
+  };
+  expense: {
+    total: number;
+    system: number;
+    user: number;
+  };
+}
 // ✅ Use enums only (remove type alias)
 export enum CategoryType {
   INCOME = 'income',

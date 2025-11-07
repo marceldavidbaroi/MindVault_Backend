@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -16,6 +17,7 @@ import { VerifyUserService } from 'src/auth/services/verify-user.service';
 import { AccountsService } from './accounts.service';
 import { RolesService } from 'src/roles/roles.service';
 import { User } from 'src/auth/entities/user.entity';
+import { Account } from '../entity/account.entity';
 
 @Injectable()
 export class AccountUserRolesService {
@@ -104,5 +106,28 @@ export class AccountUserRolesService {
     });
 
     return roles; // each item contains { user, account, role }
+  }
+  async getUserRoleForAccount(
+    userId: number,
+    accountId: number,
+  ): Promise<Account> {
+    const accountUserRole = await this.roleRepo.findOne({
+      where: { user: { id: userId }, account: { id: accountId } },
+      relations: ['role', 'account'],
+    });
+
+    if (!accountUserRole) {
+      throw new BadRequestException('You have no role on this account');
+    }
+
+    const allowedRoleIds = [1, 2, 3];
+    if (!allowedRoleIds.includes(accountUserRole.role.id)) {
+      throw new BadRequestException(
+        'You have no permission to add transactions to this account',
+      );
+    }
+
+    // Role is allowed, return the account
+    return accountUserRole.account;
   }
 }

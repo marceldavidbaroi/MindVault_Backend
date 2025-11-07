@@ -32,7 +32,17 @@ export class Account {
 
   @ApiProperty({ example: 5000, description: 'Initial balance' })
   @Column({ type: 'decimal', precision: 15, scale: 2, name: 'initial_balance' })
-  initialBalance: number;
+  initialBalance: string;
+
+  @ApiProperty({ example: 5000, description: 'Balance' })
+  @Column({
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    name: 'balance',
+    default: 0,
+  })
+  balance: string;
 
   @ManyToOne(() => AccountType, (type) => type.accounts)
   @JoinColumn({ name: 'type_id' })

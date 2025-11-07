@@ -16,6 +16,8 @@ import { VerifyUserService } from 'src/auth/services/verify-user.service';
 import { CurrencyService } from 'src/finance/currency/services/currency.service';
 import { CategoriesService } from 'src/finance/categories/categories.service';
 import { AccountsService } from 'src/finance/accounts/services/accounts.service';
+import { AccountUserRolesService } from 'src/finance/accounts/services/account-user-roles.service.service';
+import { ListTransactionsFilterDto } from '../dto/list-transactions.dto';
 
 @Injectable()
 export class TransactionService {
@@ -26,23 +28,24 @@ export class TransactionService {
     private readonly currencyService: CurrencyService,
     private readonly categoryService: CategoriesService,
     private readonly dataSource: DataSource,
+    private readonly accountUserRolesService: AccountUserRolesService,
 
     // NOTE: AccountService is used only to validate the account exists
     private readonly accountService: AccountsService,
   ) {}
 
   async createTransaction(
+    userId: number,
     dto: CreateTransactionDto,
   ): Promise<{ success: boolean; message: string; data?: Transaction }> {
     return await this.dataSource.transaction(async (manager) => {
       // validate user exists
-      const user: User = await this.verifyUserService.verify(dto.creatorUserId);
+      const user: User = await this.verifyUserService.verify(userId);
       // validate account
-      const account: Account = await this.accountService.getAccount(
+      const account = await this.accountUserRolesService.getUserRoleForAccount(
+        userId,
         dto.accountId,
-        user,
       );
-      if (!account) throw new NotFoundException('Account not found');
 
       // optionally fetch category and currency
       const category = dto.categoryId
@@ -80,6 +83,24 @@ export class TransactionService {
 
       // save transaction atomically
       const saved = await manager.save(tx);
+      const balance = Number(
+        await this.accountService.getBalance(dto.accountId),
+      );
+      const amount = Number(dto.amount);
+
+      let newBalance: number;
+
+      if (dto.type === 'income') {
+        newBalance = balance + amount;
+      } else {
+        newBalance = balance - amount;
+      }
+
+      // ✅ keep as number (if updateBalance expects number)
+      await this.accountService.updateBalance(
+        dto.accountId,
+        newBalance.toFixed(2).toString(),
+      );
 
       // ✅ Future-proof: you can update account balance here safely
       // Example:
@@ -101,35 +122,47 @@ export class TransactionService {
     return { success: true, message: 'OK', data: tx };
   }
 
-  async listTransactions(filters: any) {
+  async listTransactions(
+    accountId: number,
+    filters: ListTransactionsFilterDto,
+  ) {
     const qb = this.transactionRepo
       .createQueryBuilder('t')
-      .leftJoinAndSelect('t.account', 'account');
+      .leftJoinAndSelect('t.account', 'account')
+      .leftJoinAndSelect('t.creatorUser', 'creator')
+      .leftJoinAndSelect('t.category', 'category')
+      .leftJoinAndSelect('t.currency', 'currency');
 
-    if (filters.accountId)
-      qb.andWhere('account.id = :accountId', { accountId: filters.accountId });
+    // Mandatory filter: accountId
+    qb.where('account.id = :accountId', { accountId });
+
+    // Optional filters
     if (filters.categoryId)
-      qb.andWhere('t.categoryId = :categoryId', {
+      qb.andWhere('category.id = :categoryId', {
         categoryId: filters.categoryId,
+      });
+    if (filters.type) qb.andWhere('t.type = :type', { type: filters.type });
+    if (filters.status)
+      qb.andWhere('t.status = :status', { status: filters.status });
+    if (filters.creatorUserId)
+      qb.andWhere('creator.id = :creatorUserId', {
+        creatorUserId: filters.creatorUserId,
       });
     if (filters.from)
       qb.andWhere('t.transactionDate >= :from', { from: filters.from });
     if (filters.to) qb.andWhere('t.transactionDate <= :to', { to: filters.to });
-    if (filters.type) qb.andWhere('t.type = :type', { type: filters.type });
-    if (filters.status)
-      qb.andWhere('t.status = :status', { status: filters.status });
 
-    const page =
-      filters.page && Number(filters.page) > 0 ? Number(filters.page) : 1;
+    // Pagination
+    const page = filters.page && filters.page > 0 ? filters.page : 1;
     const pageSize =
-      filters.pageSize && Number(filters.pageSize) > 0
-        ? Number(filters.pageSize)
-        : 20;
+      filters.pageSize && filters.pageSize > 0 ? filters.pageSize : 20;
+
     qb.skip((page - 1) * pageSize)
       .take(pageSize)
       .orderBy('t.transactionDate', 'DESC');
 
     const [items, total] = await qb.getManyAndCount();
+
     return {
       success: true,
       message: 'OK',
@@ -140,7 +173,14 @@ export class TransactionService {
   async updateTransaction(id: number, dto: UpdateTransactionDto) {
     const tx = await this.transactionRepo.findOne({ where: { id } });
     if (!tx) return { success: false, message: 'Transaction not found' };
-
+    const oldTransactionBalance = Number(tx.amount);
+    const accountBalance = Number(await this.accountService.getBalance(id));
+    const newBalance =
+      accountBalance - oldTransactionBalance + Number(dto.amount);
+    await this.accountService.updateBalance(
+      id,
+      newBalance.toFixed(2).toString(),
+    );
     Object.assign(tx, dto);
     const updated = await this.transactionRepo.save(tx);
 

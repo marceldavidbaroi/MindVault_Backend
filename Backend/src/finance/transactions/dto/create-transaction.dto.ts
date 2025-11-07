@@ -14,10 +14,6 @@ export class CreateTransactionDto {
   @IsNotEmpty()
   accountId: number;
 
-  @ApiProperty({ description: 'Creator user id' })
-  @IsNotEmpty()
-  creatorUserId: number;
-
   @ApiPropertyOptional({ description: 'Category id' })
   @IsOptional()
   categoryId?: number;

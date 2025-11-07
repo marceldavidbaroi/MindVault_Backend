@@ -26,19 +26,18 @@ export class AccountsService {
     const account = this.accountRepo.create({
       name: dto.name,
       description: dto.description,
-      initialBalance: dto.initialBalance,
+      initialBalance: String(dto.initialBalance ?? '0'),
+      balance: String(dto.initialBalance ?? '0'),
       type: { id: dto.accountTypeId },
       ownerId: user.id,
     });
+
     const savedAccount = await this.accountRepo.save(account);
-    const data = await this.accountUserRolesService.assignRole(
-      user,
-      savedAccount.id,
-      {
-        userId: user.id,
-        roleId: 1,
-      },
-    );
+
+    await this.accountUserRolesService.assignRole(user, savedAccount.id, {
+      userId: user.id,
+      roleId: 1,
+    });
 
     return savedAccount;
   }
@@ -79,5 +78,35 @@ export class AccountsService {
       );
     }
     return account;
+  }
+
+  // 🆕 ---- BALANCE FUNCTIONS ----
+
+  /** ✅ Update the balance of an account */
+  async updateBalance(accountId: number, newBalance: string): Promise<Account> {
+    const account = await this.accountRepo.findOne({
+      where: { id: accountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Account with ID ${accountId} not found`);
+    }
+
+    account.balance = newBalance;
+    return await this.accountRepo.save(account);
+  }
+
+  /** ✅ Get the current balance of an account */
+  async getBalance(accountId: number): Promise<string> {
+    const account = await this.accountRepo.findOne({
+      where: { id: accountId },
+      select: ['id', 'balance'],
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Account with ID ${accountId} not found`);
+    }
+
+    return account.balance;
   }
 }

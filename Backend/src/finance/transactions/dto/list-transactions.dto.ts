@@ -1,40 +1,37 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsNumber, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
+import * as transactionEntity from '../entities/transaction.entity';
 
-export class ListTransactionsDto {
-  @ApiPropertyOptional({ description: 'Account id to filter' })
+export class ListTransactionsFilterDto {
   @IsOptional()
-  accountId?: number;
-
-  @ApiPropertyOptional({ description: 'Category id to filter' })
-  @IsOptional()
+  @Type(() => Number)
   categoryId?: number;
 
-  @ApiPropertyOptional({ description: 'Start date YYYY-MM-DD' })
   @IsOptional()
-  @IsDateString()
-  from?: string;
+  @IsIn(['income', 'expense'])
+  type?: transactionEntity.TransactionType;
 
-  @ApiPropertyOptional({ description: 'End date YYYY-MM-DD' })
   @IsOptional()
-  @IsDateString()
-  to?: string;
+  @IsIn(['pending', 'cleared', 'void', 'failed'])
+  status?: transactionEntity.TransactionStatus;
 
-  @ApiPropertyOptional({ description: 'Transaction type' })
+  @IsOptional()
+  @Type(() => Number)
+  creatorUserId?: number;
+
   @IsOptional()
   @IsString()
-  type?: 'income' | 'expense';
+  from?: string; // YYYY-MM-DD
 
-  @ApiPropertyOptional({ description: 'Status' })
   @IsOptional()
   @IsString()
-  status?: 'pending' | 'cleared' | 'void' | 'failed';
+  to?: string; // YYYY-MM-DD
 
-  @ApiPropertyOptional({ description: 'Page' })
   @IsOptional()
+  @Type(() => Number)
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Page size' })
   @IsOptional()
+  @Type(() => Number)
   pageSize?: number;
 }

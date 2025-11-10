@@ -20,6 +20,7 @@ import {
   ApiResponse as SwaggerResponse,
 } from '@nestjs/swagger';
 import { Role } from './role.entity';
+import { ApiResponse } from 'src/common/types/api-response.type';
 
 @ApiTags('Roles')
 @UseGuards(AuthGuard('jwt'))
@@ -33,19 +34,30 @@ export class RolesController {
   //   async create(@Body() dto: CreateRoleDto): Promise<Role> {
   //     return this.rolesService.create(dto);
   //   }
-
   @Get()
   @ApiOperation({ summary: 'List all roles' })
   @SwaggerResponse({ status: 200, description: 'Roles fetched successfully.' })
-  async findAll(): Promise<Role[]> {
-    return this.rolesService.findAll();
+  async findAll(): Promise<ApiResponse<Role[]>> {
+    const roles = await this.rolesService.findAll();
+    return {
+      success: true,
+      message: 'Roles fetched successfully.',
+      data: roles,
+    };
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single role' })
   @SwaggerResponse({ status: 200, description: 'Role fetched successfully.' })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Role> {
-    return this.rolesService.findOne(id);
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ApiResponse<Role>> {
+    const role = await this.rolesService.findOne(id);
+    return {
+      success: true,
+      message: 'Role fetched successfully.',
+      data: role,
+    };
   }
 
   //   @Put(':id')

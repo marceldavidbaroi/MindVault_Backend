@@ -11,7 +11,11 @@ export class CurrencyService {
   ) {}
 
   async listCurrencies(): Promise<Currency[]> {
-    return this.currencyRepo.find();
+    // Use the 'select' option to explicitly list the fields you want to return,
+    // thereby excluding 'createdAt' and 'updatedAt'.
+    return this.currencyRepo.find({
+      select: ['code', 'name', 'symbol', 'decimal', 'isActive'],
+    });
   }
 
   async verifyCurrency(code: string): Promise<Currency> {

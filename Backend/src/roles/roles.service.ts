@@ -20,7 +20,9 @@ export class RolesService {
   //   }
 
   async findAll(): Promise<Role[]> {
-    return this.roleRepo.find();
+    return this.roleRepo.find({
+      select: ['id', 'name', 'displayName', 'description'],
+    });
   }
 
   async findOne(id: number): Promise<Role> {

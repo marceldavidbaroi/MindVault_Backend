@@ -5,10 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ExchangeRate } from './exchange-rate.entity';
 import { Transaction } from 'src/finance/transactions/entities/transaction.entity';
+import { Account } from 'src/finance/accounts/entity/account.entity';
 
 @Entity('currencies')
 export class Currency {
@@ -49,4 +51,7 @@ export class Currency {
 
   @OneToMany(() => Transaction, (transaction) => transaction.currency)
   transactions: Transaction[];
+
+  @OneToMany(() => Account, (account) => account.currencyCode)
+  account: Account;
 }

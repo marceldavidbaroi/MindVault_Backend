@@ -95,18 +95,36 @@ export class AccountUserRolesService {
     return roles;
   }
 
-  async getUserAccountsWithRoles(user: User): Promise<AccountUserRole[]> {
+  async getUserAccountsWithRoles(user: User): Promise<any[]> {
     // Ensure the user exists
     await this.verifyUserService.verify(user.id);
 
     // Find all roles for this user across all accounts
     const roles = await this.roleRepo.find({
       where: { user: { id: user.id } },
-      relations: ['role', 'account'], // include account and role details
+      relations: ['role', 'account'],
     });
 
-    return roles; // each item contains { user, account, role }
+    // Remove createdAt and updatedAt fields
+    return roles.map(({ id, account, role }) => ({
+      id,
+      account: {
+        id: account.id,
+        name: account.name,
+        description: account.description,
+        initialBalance: account.initialBalance,
+        balance: account.balance,
+        ownerId: account.ownerId,
+      },
+      role: {
+        id: role.id,
+        name: role.name,
+        displayName: role.displayName,
+        description: role.description,
+      },
+    }));
   }
+
   async getUserRoleForAccount(
     userId: number,
     accountId: number,

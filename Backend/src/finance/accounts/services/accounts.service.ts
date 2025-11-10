@@ -12,6 +12,7 @@ import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
 import { User } from 'src/auth/entities/user.entity';
 import { AccountUserRolesService } from './account-user-roles.service.service';
+import { CurrencyService } from 'src/finance/currency/services/currency.service';
 
 @Injectable()
 export class AccountsService {
@@ -20,12 +21,17 @@ export class AccountsService {
     private readonly accountRepo: Repository<Account>,
     @Inject(forwardRef(() => AccountUserRolesService))
     private readonly accountUserRolesService: AccountUserRolesService,
+    private readonly currencyService: CurrencyService,
   ) {}
 
   async createAccount(user: User, dto: CreateAccountDto): Promise<Account> {
+    const currency = await this.currencyService.verifyCurrency(
+      dto.currencyCode,
+    );
     const account = this.accountRepo.create({
       name: dto.name,
       description: dto.description,
+      currencyCode: currency,
       initialBalance: String(dto.initialBalance ?? '0'),
       balance: String(dto.initialBalance ?? '0'),
       type: { id: dto.accountTypeId },
@@ -64,13 +70,18 @@ export class AccountsService {
   async listAccounts(user: User): Promise<any[]> {
     const qb = this.accountRepo
       .createQueryBuilder('account')
-      .leftJoin('account.type', 'type')
+      .leftJoinAndSelect('account.type', 'type')
+      .leftJoinAndSelect('account.currencyCode', 'currency') // join correct relation
       .select([
         'account.id',
         'account.name',
-        'account.balance', // include any scalar fields you want
+        'account.balance',
+        'account.description',
         'type.id',
         'type.name',
+        'currency.code',
+        'currency.name',
+        'currency.symbol',
       ])
       .where('account.ownerId = :ownerId', { ownerId: user.id });
 

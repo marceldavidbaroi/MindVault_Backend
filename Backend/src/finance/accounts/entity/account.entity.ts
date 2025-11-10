@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   JoinColumn,
+  OneToOne,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from 'src/auth/entities/user.entity';
@@ -15,6 +16,7 @@ import { AccountUserRole } from './account-user-role.entity';
 import { DailySummary } from 'src/finance/summary/entity/daily-summary.entity';
 import { MonthlySummary } from 'src/finance/summary/entity/monthly-summary.entity';
 import { MonthlyCategorySummary } from 'src/finance/summary/entity/monthly-category-summary.entity';
+import { Currency } from 'src/finance/currency/entity/currency.entity';
 
 @Entity('accounts')
 export class Account {
@@ -54,6 +56,10 @@ export class Account {
   @ApiProperty({ example: 1, description: 'Owner user ID' })
   @Column({ type: 'int', name: 'owner_id' })
   ownerId: number;
+
+  @ManyToOne(() => Currency, (currency) => currency.code)
+  @JoinColumn({ name: 'currency_code' })
+  currencyCode: Currency;
 
   @ManyToOne(() => User, (user) => user.accounts)
   @JoinColumn({ name: 'owner_id' })

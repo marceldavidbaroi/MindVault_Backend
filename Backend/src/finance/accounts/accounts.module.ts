@@ -10,12 +10,14 @@ import { AccountUserRole } from './entity/account-user-role.entity';
 import { AccountTypeSeeder } from './account-type.seeder';
 import { RolesModule } from 'src/roles/roles.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { CurrencyModule } from '../currency/currency.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Account, AccountType, AccountUserRole]),
     RolesModule,
     AuthModule,
+    CurrencyModule,
   ],
   controllers: [AccountsController],
   providers: [

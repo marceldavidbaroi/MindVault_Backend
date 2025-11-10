@@ -10,7 +10,10 @@ export class AccountTypesService {
     private readonly accountTypeRepo: Repository<AccountType>,
   ) {}
 
-  async listAccountTypes(): Promise<AccountType[]> {
-    return await this.accountTypeRepo.find({ where: { isActive: true } });
+  async listAccountTypes(): Promise<any> {
+    return await this.accountTypeRepo.find({
+      select: ['id', 'name', 'description', 'isActive', 'scope'], // explicitly select only what you need
+      where: { isActive: true },
+    });
   }
 }

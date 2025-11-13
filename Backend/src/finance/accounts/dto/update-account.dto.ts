@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsOptional, IsInt } from 'class-validator';
+import { IsString, IsInt, IsOptional } from 'class-validator';
 
 export class UpdateAccountDto {
   @ApiProperty({ example: 'Updated Account Name', required: false })
@@ -14,10 +14,19 @@ export class UpdateAccountDto {
 
   @ApiProperty({
     example: 2,
-    description: 'Optional new account type ID',
+    description: 'Updated account type ID',
     required: false,
   })
   @IsOptional()
   @IsInt()
-  typeId?: number;
+  accountTypeId?: number;
+
+  @ApiProperty({
+    example: 'USD',
+    description: 'Updated currency code for the account',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  currencyCode?: string;
 }

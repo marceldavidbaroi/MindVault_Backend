@@ -40,10 +40,7 @@ export class AccountsService {
 
     const savedAccount = await this.accountRepo.save(account);
 
-    await this.accountUserRolesService.assignRole(user, savedAccount.id, {
-      userId: user.id,
-      roleId: 1,
-    });
+    await this.accountUserRolesService.assignOwnerRole(user, savedAccount);
 
     return savedAccount;
   }
@@ -54,7 +51,24 @@ export class AccountsService {
     user: User,
   ): Promise<Account> {
     const account = await this.getAccountByIdAndUser(id, user);
-    Object.assign(account, dto);
+
+    // Update primitive fields
+    if (dto.name) account.name = dto.name;
+    if (account.description) account.description = dto.description ?? null;
+
+    // Update currency relation
+    if (dto.currencyCode) {
+      const currency = await this.currencyService.verifyCurrency(
+        dto.currencyCode,
+      );
+      account.currencyCode = currency;
+    }
+
+    // Update account type relation
+    if (dto.accountTypeId) {
+      account.type = { id: dto.accountTypeId } as any; // TypeORM will understand this as relation update
+    }
+
     return await this.accountRepo.save(account);
   }
 
@@ -63,8 +77,42 @@ export class AccountsService {
     await this.accountRepo.remove(account);
   }
 
-  async getAccount(id: number, user: User): Promise<Account> {
-    return await this.getAccountByIdAndUser(id, user);
+  async getAccount(id: number, user: User): Promise<any> {
+    // 🔹 Step 1: Fetch account with relations
+    const account = await this.accountRepo.findOne({
+      where: { id },
+      relations: ['type', 'currencyCode'],
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Account with ID ${id} not found`);
+    }
+    const hasAccess = await this.accountUserRolesService.findOne(id, user.id);
+
+    if (!hasAccess) {
+      throw new NotFoundException(`You have no access to view this account`);
+    }
+    // 🔹 Step 3: Get users and roles using your existing method
+    const userRoles = await this.accountUserRolesService.listRoles(id);
+
+    // 🔹 Step 4: Format output neatly
+    const users = userRoles.map((ur) => ({
+      id: ur.user.id,
+      username: ur.user.username,
+      email: ur.user.email,
+      role: {
+        id: ur.role.id,
+        name: ur.role.name,
+        displayName: ur.role.displayName,
+        description: ur.role.description,
+      },
+    }));
+
+    // 🔹 Step 5: Return full account details
+    return {
+      ...account,
+      users,
+    };
   }
 
   async listAccounts(user: User): Promise<any[]> {

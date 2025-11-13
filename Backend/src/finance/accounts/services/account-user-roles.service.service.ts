@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,8 +12,6 @@ import { AccountUserRole } from '../entity/account-user-role.entity';
 import { AssignRoleDto } from '../dto/assign-role.dto';
 import { UpdateRoleDto } from '../dto/update-role.dto';
 import { Role } from 'src/roles/role.entity';
-import { AccountUserRoleDto } from '../dto/account-user-role.dto';
-import { plainToInstance } from 'class-transformer';
 import { VerifyUserService } from 'src/auth/services/verify-user.service';
 import { AccountsService } from './accounts.service';
 import { RolesService } from 'src/roles/roles.service';
@@ -46,16 +45,56 @@ export class AccountUserRolesService {
     return accountUserRole;
   }
 
+  async assignOwnerRole(user: User, account: Account) {
+    const ownerRole = await this.rolesService.findOne(1);
+
+    // Check if the user already has a role in this account
+    const existing = await this.roleRepo.findOne({
+      where: {
+        account: { id: account.id },
+        user: { id: user.id },
+      },
+    });
+
+    if (existing) {
+      // Update the role to owner if not already
+      existing.role = ownerRole;
+      return await this.roleRepo.save(existing);
+    }
+
+    // Otherwise, create a new owner role entry
+    const accountUserRole = this.roleRepo.create({
+      account,
+      user,
+      role: ownerRole,
+    });
+
+    return await this.roleRepo.save(accountUserRole);
+  }
+
   /** Assign a role to a user for an account */
-  async assignRole(
-    owner: User,
-    accountId: number,
-    dto: AssignRoleDto,
-  ): Promise<AccountUserRole> {
-    console.log('this is called');
+  async assignRole(owner: User, accountId: number, dto: AssignRoleDto) {
+    // Prevent assigning Owner role
+    if (dto.roleId === 1) {
+      throw new BadRequestException(
+        'Cannot assign Owner role using this method. Use assignOwnerRole or transferOwnership.',
+      );
+    }
+
     const role = await this.rolesService.findOne(dto.roleId);
-    const user = await this.verifyUserService.verify(dto.userId);
+    const user = await this.verifyUserService.verify(dto.username);
     const account = await this.accountsService.getAccount(accountId, owner);
+
+    // Check if the user already has a role for this account
+    const existing = await this.roleRepo.findOne({
+      where: { account: { id: account.id }, user: { id: user.id } },
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        `User ${user.id} already has a role (${existing.role.displayName}) on this account`,
+      );
+    }
 
     const accountUserRole = this.roleRepo.create({
       account,
@@ -68,26 +107,90 @@ export class AccountUserRolesService {
 
   /** Update an existing role for a user on an account */
   async updateRole(
+    currentUser: User,
     accountId: number,
     userId: number,
     dto: UpdateRoleDto,
   ): Promise<AccountUserRole> {
-    const accountUserRole = await this.findOne(accountId, userId);
+    // Prevent updating role to Owner
+    if (dto.roleId === 1) {
+      throw new BadRequestException(
+        'Cannot assign Owner role using this method. Use assignOwnerRole or transferOwnership.',
+      );
+    }
 
-    const role = await this.rolesService.findOne(dto.roleId);
-    accountUserRole.role = role;
+    const currentUserRole = await this.findOne(accountId, currentUser.id);
 
-    return await this.roleRepo.save(accountUserRole);
+    // Only Owner (1) or Admin (2) can update roles
+    if (![1, 2].includes(currentUserRole.role.id)) {
+      throw new ForbiddenException(
+        'Only Owner or Admin can update roles on this account',
+      );
+    }
+
+    const targetUserRole = await this.findOne(accountId, userId);
+    const newRole = await this.rolesService.findOne(dto.roleId);
+
+    // Prevent downgrading an owner (already handled separately)
+    if (targetUserRole.role.id === 1) {
+      throw new BadRequestException(
+        'Owner role can only be changed using transferOwnership.',
+      );
+    }
+
+    targetUserRole.role = newRole;
+    return await this.roleRepo.save(targetUserRole);
   }
 
   /** Remove a user's role from an account */
-  async removeRole(accountId: number, userId: number): Promise<void> {
-    const accountUserRole = await this.findOne(accountId, userId);
-    await this.roleRepo.remove(accountUserRole);
+  async removeRole(
+    currentUser: User,
+    accountId: number,
+    userId: number,
+  ): Promise<void> {
+    const currentUserRole = await this.findOne(accountId, currentUser.id);
+    const targetUserRole = await this.findOne(accountId, userId);
+
+    // Rules:
+    // - Admin (2) can delete editor (3) or viewer (4)
+    // - Owner (1) can delete anyone, but at least one role must remain
+    // - User can delete their own role if they are not the owner
+
+    if (currentUser.id === userId) {
+      // self-removal
+      if (currentUserRole.role.id === 1) {
+        throw new BadRequestException('Owner cannot remove their own role');
+      }
+    } else {
+      if (currentUserRole.role.id === 2) {
+        // Admin permissions
+        if (![3].includes(targetUserRole.role.id)) {
+          throw new ForbiddenException(
+            'Admin can only remove Editor or Viewer roles',
+          );
+        }
+      } else if (currentUserRole.role.id === 1) {
+        // Owner permissions
+        const roleCount = await this.roleRepo.count({
+          where: { account: { id: accountId } },
+        });
+        if (roleCount <= 1) {
+          throw new BadRequestException(
+            'At least one user must be associated with the account',
+          );
+        }
+      } else {
+        throw new ForbiddenException(
+          'You do not have permission to remove this role',
+        );
+      }
+    }
+
+    await this.roleRepo.remove(targetUserRole);
   }
 
   /** List all roles for an account */
-  async listRoles(accountId: number): Promise<any> {
+  async listRoles(accountId: number) {
     const roles = await this.roleRepo.find({
       where: { account: { id: accountId } },
       relations: ['role', 'user'],
@@ -95,17 +198,15 @@ export class AccountUserRolesService {
     return roles;
   }
 
+  /** Get all accounts with their roles for a user */
   async getUserAccountsWithRoles(user: User): Promise<any[]> {
-    // Ensure the user exists
     await this.verifyUserService.verify(user.id);
 
-    // Find all roles for this user across all accounts
     const roles = await this.roleRepo.find({
       where: { user: { id: user.id } },
       relations: ['role', 'account'],
     });
 
-    // Remove createdAt and updatedAt fields
     return roles.map(({ id, account, role }) => ({
       id,
       account: {
@@ -125,6 +226,7 @@ export class AccountUserRolesService {
     }));
   }
 
+  /** Get user’s role for an account */
   async getUserRoleForAccount(
     userId: number,
     accountId: number,
@@ -145,7 +247,50 @@ export class AccountUserRolesService {
       );
     }
 
-    // Role is allowed, return the account
     return accountUserRole.account;
+  }
+
+  /** Transfer ownership of an account to another user */
+  async transferOwnership(
+    currentOwner: User,
+    accountId: number,
+    newOwnerId: number,
+  ): Promise<void> {
+    const currentOwnerRole = await this.findOne(accountId, currentOwner.id);
+
+    if (currentOwnerRole.role.id !== 1) {
+      throw new ForbiddenException(
+        'Only the current owner can transfer ownership',
+      );
+    }
+
+    const newOwnerRole = await this.findOne(accountId, newOwnerId).catch(
+      () => null,
+    );
+    const ownerRole = await this.rolesService.findOne(1);
+    const adminRole = await this.rolesService.findOne(2);
+
+    if (newOwnerRole) {
+      // If user already has a role, promote to owner
+      newOwnerRole.role = ownerRole;
+      await this.roleRepo.save(newOwnerRole);
+    } else {
+      // Assign owner role to user if not yet assigned
+      const newOwnerUser = await this.verifyUserService.verify(newOwnerId);
+      const account = await this.accountsService.getAccount(
+        accountId,
+        currentOwner,
+      );
+      const newRole = this.roleRepo.create({
+        account,
+        user: newOwnerUser,
+        role: ownerRole,
+      });
+      await this.roleRepo.save(newRole);
+    }
+
+    // Demote current owner to admin
+    currentOwnerRole.role = adminRole;
+    await this.roleRepo.save(currentOwnerRole);
   }
 }

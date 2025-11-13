@@ -77,12 +77,8 @@ export class AccountsController {
   async getUserAccountsWithRoles(
     @GetUser() user: User,
   ): Promise<ApiResponse<any[]>> {
-    // Fetch all roles for the current user
     const roles =
       await this.accountUserRolesService.getUserAccountsWithRoles(user);
-
-    // Map to a cleaner structure for frontend: each account with its role
-
     return {
       success: true,
       message: 'Accounts with roles fetched',
@@ -168,11 +164,13 @@ export class AccountsController {
   @ApiOperation({ summary: 'Update a user role for an account' })
   @SwaggerResponse({ status: 200, description: 'Role updated successfully.' })
   async updateRole(
+    @GetUser() user: User,
     @Param('id', ParseIntPipe) accountId: number,
     @Param('userId', ParseIntPipe) userId: number,
     @Body() dto: UpdateRoleDto,
   ): Promise<ApiResponse<AccountUserRole>> {
     const role = await this.accountUserRolesService.updateRole(
+      user,
       accountId,
       userId,
       dto,
@@ -184,10 +182,11 @@ export class AccountsController {
   @ApiOperation({ summary: 'Remove a user role from an account' })
   @SwaggerResponse({ status: 200, description: 'Role removed successfully.' })
   async removeRole(
+    @GetUser() user: User,
     @Param('id', ParseIntPipe) accountId: number,
     @Param('userId', ParseIntPipe) userId: number,
   ): Promise<ApiResponse<null>> {
-    await this.accountUserRolesService.removeRole(accountId, userId);
+    await this.accountUserRolesService.removeRole(user, accountId, userId);
     return { success: true, message: 'Role removed', data: null };
   }
 
@@ -196,8 +195,28 @@ export class AccountsController {
   @SwaggerResponse({ status: 200, description: 'Roles fetched successfully.' })
   async listRoles(
     @Param('id', ParseIntPipe) accountId: number,
-  ): Promise<ApiResponse<AccountUserRoleDto[]>> {
+  ): Promise<ApiResponse<any[]>> {
     const roles = await this.accountUserRolesService.listRoles(accountId);
     return { success: true, message: 'Roles fetched', data: roles };
+  }
+
+  // --------- Ownership Transfer ---------
+  @Post(':id/transfer-ownership/:newOwnerId')
+  @ApiOperation({ summary: 'Transfer account ownership to another user' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Ownership transferred successfully.',
+  })
+  async transferOwnership(
+    @GetUser() currentOwner: User,
+    @Param('id', ParseIntPipe) accountId: number,
+    @Param('newOwnerId', ParseIntPipe) newOwnerId: number,
+  ): Promise<ApiResponse<null>> {
+    await this.accountUserRolesService.transferOwnership(
+      currentOwner,
+      accountId,
+      newOwnerId,
+    );
+    return { success: true, message: 'Ownership transferred', data: null };
   }
 }

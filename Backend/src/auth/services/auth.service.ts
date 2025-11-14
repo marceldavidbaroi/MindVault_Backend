@@ -29,12 +29,13 @@ export interface JwtPayload {
 @Injectable()
 export class AuthService {
   constructor(
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(UserPreferences)
     private readonly preferencesRepository: Repository<UserPreferences>,
     @InjectRepository(UserSession)
     private readonly userSessionRepository: Repository<UserSession>,
     private readonly jwtService: JwtService,
-    private readonly verifyUserService: VerifyUserService, // ✅ inject service
+    private readonly verifyUserService: VerifyUserService,
   ) {}
 
   private async hashPassword(password: string): Promise<string> {
@@ -55,25 +56,25 @@ export class AuthService {
     const hashedPassword = await this.hashPassword(password);
     const passkey = generatePasskey();
 
-    const user = new User();
-    user.username = username;
-    user.password = hashedPassword;
-    user.passkey = passkey;
-    user.passkeyExpiresAt = undefined;
-    user.isActive = true;
+    const user = this.userRepository.create({
+      username,
+      password: hashedPassword,
+      passkey,
+      isActive: true,
+    });
 
     try {
-      await user.save();
+      const createdUser = await this.userRepository.save(user);
 
       const preferences = this.preferencesRepository.create({
-        user,
+        user: createdUser,
         frontend: {},
         backend: {},
       });
       await this.preferencesRepository.save(preferences);
 
       return { message: 'Signup successful', passkey };
-    } catch {
+    } catch (err) {
       throw new InternalServerErrorException('Error creating user');
     }
   }
@@ -87,8 +88,14 @@ export class AuthService {
   ): Promise<{ user: Partial<User> }> {
     const { username, password } = authCredentialsDto;
 
-    // ✅ Use VerifyUserService to fetch user with password
-    const user = await this.verifyUserService.verify(username);
+    let user: User;
+    try {
+      user = await this.verifyUserService.verify(username);
+    } catch (err) {
+      if (err.name === 'NotFoundException')
+        throw new BadRequestException('Invalid username or password');
+      throw err;
+    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
@@ -98,7 +105,6 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-    // Save session
     const session = this.userSessionRepository.create({
       user,
       refreshToken: await bcrypt.hash(refreshToken, 10),
@@ -137,7 +143,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // ✅ Use VerifyUserService
     const user = await this.verifyUserService.verify(payload.sub);
 
     const session = await this.userSessionRepository.findOne({

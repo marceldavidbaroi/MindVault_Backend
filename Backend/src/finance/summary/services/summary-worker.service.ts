@@ -323,4 +323,94 @@ export class SummaryWorkerService {
       `Updated summaries for transaction update ${newTransaction.id}`,
     );
   }
+
+  async handleTransactionDelete(transaction: Transaction) {
+    const { account, amount, transactionDate, type, category } = transaction;
+
+    const decimalAmount = parseFloat(amount);
+    if (isNaN(decimalAmount)) {
+      this.logger.error(
+        `Invalid transaction amount on delete: ${amount} for transaction ${transaction.id}`,
+      );
+      return;
+    }
+
+    const day = dayjs(transactionDate).format('YYYY-MM-DD');
+    const year = dayjs(transactionDate).year();
+    const month = dayjs(transactionDate).month() + 1;
+
+    await this.dataSource.transaction(async (manager) => {
+      // -------------------------------------------------------------
+      // DAILY SUMMARY — subtract the amount
+      // -------------------------------------------------------------
+      let daily = await manager.findOne(DailySummary, {
+        where: { date: day, account: { id: account.id } },
+        relations: ['account'],
+      });
+
+      if (daily) {
+        if (type === 'income') {
+          daily.totalIncome = (
+            parseFloat(daily.totalIncome) - decimalAmount
+          ).toFixed(2);
+        } else {
+          daily.totalExpense = (
+            parseFloat(daily.totalExpense) - decimalAmount
+          ).toFixed(2);
+        }
+
+        await manager.save(daily);
+      }
+
+      // -------------------------------------------------------------
+      // MONTHLY SUMMARY — subtract the amount
+      // -------------------------------------------------------------
+      let monthly = await manager.findOne(MonthlySummary, {
+        where: { account: { id: account.id }, year, month },
+        relations: ['account'],
+      });
+
+      if (monthly) {
+        if (type === 'income') {
+          monthly.totalIncome = (
+            parseFloat(monthly.totalIncome) - decimalAmount
+          ).toFixed(2);
+        } else {
+          monthly.totalExpense = (
+            parseFloat(monthly.totalExpense) - decimalAmount
+          ).toFixed(2);
+        }
+
+        await manager.save(monthly);
+      }
+
+      // -------------------------------------------------------------
+      // MONTHLY CATEGORY SUMMARY — subtract category amount
+      // -------------------------------------------------------------
+      if (category) {
+        let catSummary = await manager.findOne(MonthlyCategorySummary, {
+          where: {
+            account: { id: account.id },
+            category: { id: category.id },
+            type,
+            year,
+            month,
+          },
+          relations: ['account', 'category'],
+        });
+
+        if (catSummary) {
+          catSummary.totalAmount = (
+            parseFloat(catSummary.totalAmount) - decimalAmount
+          ).toFixed(2);
+
+          await manager.save(catSummary);
+        }
+      }
+    });
+
+    this.logger.log(
+      `Updated summaries for deleted transaction ${transaction.id}`,
+    );
+  }
 }

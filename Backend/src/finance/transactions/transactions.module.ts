@@ -12,10 +12,18 @@ import { CurrencyModule } from 'src/finance/currency/currency.module';
 import { CategoriesModule } from 'src/finance/categories/categories.module';
 import { AuthModule } from 'src/auth/auth.module';
 import { SummaryModule } from '../summary/summary.module';
+import { AccountLedger } from './entities/ledger.entity';
+import { LedgerService } from './services/ledger.service';
+import { Account } from '../accounts/entity/account.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Transaction, RecurringTransactionSchedule]),
+    TypeOrmModule.forFeature([
+      Transaction,
+      RecurringTransactionSchedule,
+      AccountLedger,
+      Account,
+    ]),
     // account module is used for accountService
     AccountsModule,
     CurrencyModule,
@@ -25,7 +33,7 @@ import { SummaryModule } from '../summary/summary.module';
     AuthModule,
   ],
   controllers: [TransactionsController],
-  providers: [TransactionService, RecurringTransactionService],
+  providers: [TransactionService, RecurringTransactionService, LedgerService],
   exports: [TransactionService, RecurringTransactionService],
 })
 export class TransactionsModule {}

@@ -7,6 +7,7 @@ import {
   ManyToOne,
   Index,
   OneToMany,
+  JoinColumn,
 } from 'typeorm';
 import { Account } from 'src/finance/accounts/entity/account.entity';
 import { User } from 'src/auth/entities/user.entity';
@@ -27,14 +28,17 @@ export class Transaction {
   id: number;
 
   @ManyToOne(() => Account, { nullable: false })
+  @JoinColumn({ name: 'account_id' })
   account: Account;
 
   @ManyToOne(() => User, (user) => user.transactions, { nullable: false })
+  @JoinColumn({ name: 'creator_id' })
   creatorUser: User;
 
   @ManyToOne(() => Category, (category) => category.transactions, {
     nullable: true,
   })
+  @JoinColumn({ name: 'category_id' })
   category?: Category;
 
   @Column({ type: 'varchar', length: 10 })
@@ -46,6 +50,7 @@ export class Transaction {
   @ManyToOne(() => Currency, (currency) => currency.transactions, {
     nullable: true,
   })
+  @JoinColumn({ name: 'currency_code' })
   currency?: Currency;
 
   @Column({ type: 'date', name: 'transaction_date' })

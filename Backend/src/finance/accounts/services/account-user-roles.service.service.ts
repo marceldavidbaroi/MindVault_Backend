@@ -204,9 +204,8 @@ export class AccountUserRolesService {
 
     const roles = await this.roleRepo.find({
       where: { user: { id: user.id } },
-      relations: ['role', 'account'],
+      relations: ['role', 'account', 'account.currency'],
     });
-
     return roles.map(({ id, account, role }) => ({
       id,
       account: {
@@ -216,6 +215,7 @@ export class AccountUserRolesService {
         initialBalance: account.initialBalance,
         balance: account.balance,
         ownerId: account.ownerId,
+        currency: account.currency?.code,
       },
       role: {
         id: role.id,

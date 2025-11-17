@@ -52,6 +52,6 @@ export class Currency {
   @OneToMany(() => Transaction, (transaction) => transaction.currency)
   transactions: Transaction[];
 
-  @OneToMany(() => Account, (account) => account.currencyCode)
-  account: Account;
+  @OneToMany(() => Account, (account) => account.currency)
+  accounts: Account[];
 }

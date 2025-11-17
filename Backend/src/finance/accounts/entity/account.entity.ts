@@ -60,9 +60,9 @@ export class Account {
   @Column({ type: 'int', name: 'owner_id' })
   ownerId: number;
 
-  @ManyToOne(() => Currency, (currency) => currency.code)
-  @JoinColumn({ name: 'currency_code' })
-  currencyCode: Currency;
+  @ManyToOne(() => Currency, (currency) => currency.accounts)
+  @JoinColumn({ name: 'currency_code', referencedColumnName: 'code' })
+  currency: Currency;
 
   @ManyToOne(() => User, (user) => user.accounts)
   @JoinColumn({ name: 'owner_id' })

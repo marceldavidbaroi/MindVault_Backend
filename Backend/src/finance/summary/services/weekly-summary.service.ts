@@ -24,4 +24,25 @@ export class WeeklySummaryService {
     const lastWeek = await this.getWeeklySummary(accountId, prevWeekStart);
     return { thisWeek, lastWeek };
   }
+
+  async getLastNWeeks(accountId: number, n: number) {
+    // Explicit type for results array
+    type WeekSummaryResult = {
+      weekStart: string;
+      summary: WeeklySummary | null;
+    };
+
+    const results: WeekSummaryResult[] = [];
+
+    for (let i = n - 1; i >= 0; i--) {
+      const weekStart = dayjs()
+        .subtract(i, 'week')
+        .startOf('week')
+        .format('YYYY-MM-DD');
+      const summary = await this.getWeeklySummary(accountId, weekStart);
+      results.push({ weekStart, summary });
+    }
+
+    return results;
+  }
 }

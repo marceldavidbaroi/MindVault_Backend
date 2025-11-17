@@ -38,16 +38,18 @@ export class TrendInsightService {
     dateOrMonth: string | number,
     year?: number,
   ) {
-    if (period === 'daily')
+    if (period === 'daily') {
       return this.categoryService.getDailyCategorySummary(
         accountId,
         dateOrMonth as string,
       );
-    else
+    } else {
+      const yearValue = year ?? new Date().getFullYear(); // fallback to current year
       return this.categoryService.getMonthlyCategorySummary(
         accountId,
         dateOrMonth as number,
-        year,
+        yearValue,
       );
+    }
   }
 }

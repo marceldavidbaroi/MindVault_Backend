@@ -31,7 +31,7 @@ export class AccountsService {
     const account = this.accountRepo.create({
       name: dto.name,
       description: dto.description,
-      currencyCode: currency,
+      currency: currency,
       initialBalance: String(dto.initialBalance ?? '0'),
       balance: String(dto.initialBalance ?? '0'),
       type: { id: dto.accountTypeId },
@@ -61,7 +61,7 @@ export class AccountsService {
       const currency = await this.currencyService.verifyCurrency(
         dto.currencyCode,
       );
-      account.currencyCode = currency;
+      account.currency = currency;
     }
 
     // Update account type relation
@@ -119,7 +119,7 @@ export class AccountsService {
     const qb = this.accountRepo
       .createQueryBuilder('account')
       .leftJoinAndSelect('account.type', 'type')
-      .leftJoinAndSelect('account.currencyCode', 'currency') // join correct relation
+      .leftJoinAndSelect('account.currency', 'currency') // join correct relation
       .select([
         'account.id',
         'account.name',

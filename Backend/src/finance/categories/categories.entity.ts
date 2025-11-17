@@ -12,6 +12,7 @@ import {
 import { User } from 'src/auth/entities/user.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
 import { MonthlyCategorySummary } from '../summary/entity/monthly-category-summary.entity';
+import { DailyCategorySummary } from '../summary/entity/daily-category-summary.entity';
 export interface CategoryStats {
   total: number;
   income: {
@@ -84,4 +85,10 @@ export class Category {
     (monthlyCategorySummary) => monthlyCategorySummary.category,
   )
   monthlyCategorySummary: Category[];
+
+  @OneToMany(
+    () => DailyCategorySummary,
+    (dailyCategorySummary) => dailyCategorySummary.category,
+  )
+  dailyCategorySummaries: DailyCategorySummary[];
 }

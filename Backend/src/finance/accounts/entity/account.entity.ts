@@ -17,6 +17,9 @@ import { DailySummary } from 'src/finance/summary/entity/daily-summary.entity';
 import { MonthlySummary } from 'src/finance/summary/entity/monthly-summary.entity';
 import { MonthlyCategorySummary } from 'src/finance/summary/entity/monthly-category-summary.entity';
 import { Currency } from 'src/finance/currency/entity/currency.entity';
+import { DailyCategorySummary } from 'src/finance/summary/entity/daily-category-summary.entity';
+import { WeeklySummary } from 'src/finance/summary/entity/weekly-summary.entity';
+import { YearlySummary } from 'src/finance/summary/entity/yearly-summary.entity';
 
 @Entity('accounts')
 export class Account {
@@ -85,4 +88,16 @@ export class Account {
     (monthlyCategorySummary) => monthlyCategorySummary.account,
   )
   monthlyCategorySummary: MonthlyCategorySummary[];
+
+  @OneToMany(
+    () => DailyCategorySummary,
+    (dailyCategorySummary) => dailyCategorySummary.account,
+  )
+  dailyCategorySummaries: DailyCategorySummary[];
+
+  @OneToMany(() => WeeklySummary, (weeklySummary) => weeklySummary.account)
+  weeklySummaries: WeeklySummary[];
+
+  @OneToMany(() => YearlySummary, (yearlySummary) => yearlySummary.account)
+  yearlySummaries: YearlySummary[];
 }

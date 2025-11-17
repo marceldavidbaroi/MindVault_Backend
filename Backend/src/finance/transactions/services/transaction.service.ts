@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Transaction } from '../entities/transaction.entity';
 import { CreateTransactionDto } from '../dto/create-transaction.dto';
 import { UpdateTransactionDto } from '../dto/update-transaction.dto';
@@ -33,21 +33,19 @@ export class TransactionService {
     private readonly ledgerService: LedgerService,
   ) {}
 
-  async createTransaction(
-    userId: number,
-    dto: CreateTransactionDto,
-  ): Promise<{ success: boolean; message: string; data?: Transaction }> {
+  // ----------------------------------------------------------
+  // CREATE TRANSACTION
+  // ----------------------------------------------------------
+
+  async createTransaction(userId: number, dto: CreateTransactionDto) {
     return await this.dataSource.transaction(async (manager) => {
-      // validate user exists
       const user: User = await this.verifyUserService.verify(userId);
 
-      // validate account
       const account = await this.accountUserRolesService.getUserRoleForAccount(
         userId,
         dto.accountId,
       );
 
-      // optional category and currency validation
       const category = dto.categoryId
         ? await this.categoryService.verifyCategory(dto.categoryId)
         : undefined;
@@ -56,7 +54,6 @@ export class TransactionService {
         ? await this.currencyService.verifyCurrency(dto.currencyCode)
         : undefined;
 
-      // externalRefId must be unique
       if (dto.externalRefId) {
         const existing = await manager.findOne(Transaction, {
           where: { externalRefId: dto.externalRefId },
@@ -65,7 +62,6 @@ export class TransactionService {
           throw new BadRequestException('externalRefId must be unique');
       }
 
-      // create transaction entity
       const tx = this.transactionRepo.create({
         account,
         creatorUser: user,
@@ -81,27 +77,27 @@ export class TransactionService {
         recurringInterval: dto.recurringInterval,
       });
 
-      // save transaction
       const savedTx = await manager.save(tx);
 
-      // update account balance
+      // UPDATE ACCOUNT BALANCE
       const currentBalance = Number(
         await this.accountService.getBalance(dto.accountId),
       );
       const amount = Number(dto.amount);
-      const newBalance =
+      const balance =
         dto.type === 'income'
           ? currentBalance + amount
           : currentBalance - amount;
+
       await this.accountService.updateBalance(
         dto.accountId,
-        newBalance.toFixed(2),
+        balance.toFixed(2),
       );
 
-      // update summaries
+      // UPDATE SUMMARY TABLES
       await this.summaryWorkerService.handleTransaction(savedTx);
 
-      // create ledger entry (transaction-safe)
+      // LEDGER
       await this.ledgerService.createEntry(
         {
           accountId: account.id,
@@ -118,11 +114,19 @@ export class TransactionService {
     });
   }
 
+  // ----------------------------------------------------------
+  // GET SINGLE TRANSACTION
+  // ----------------------------------------------------------
+
   async getTransaction(id: number) {
     const tx = await this.transactionRepo.findOne({ where: { id } });
     if (!tx) return { success: false, message: 'Transaction not found' };
     return { success: true, message: 'OK', data: tx };
   }
+
+  // ----------------------------------------------------------
+  // LIST TRANSACTIONS
+  // ----------------------------------------------------------
 
   async listTransactions(
     accountId: number,
@@ -152,9 +156,8 @@ export class TransactionService {
         'currency.symbol',
         'creator.id',
         'creator.username',
-      ]);
-
-    qb.where('account.id = :accountId', { accountId });
+      ])
+      .where('account.id = :accountId', { accountId });
 
     if (filters.categoryId)
       qb.andWhere('category.id = :categoryId', {
@@ -171,9 +174,8 @@ export class TransactionService {
       qb.andWhere('t.transactionDate >= :from', { from: filters.from });
     if (filters.to) qb.andWhere('t.transactionDate <= :to', { to: filters.to });
 
-    const page = filters.page && filters.page > 0 ? filters.page : 1;
-    const pageSize =
-      filters.pageSize && filters.pageSize > 0 ? filters.pageSize : 20;
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 20;
 
     qb.skip((page - 1) * pageSize)
       .take(pageSize)
@@ -181,7 +183,7 @@ export class TransactionService {
 
     const [items, total] = await qb.getManyAndCount();
 
-    const formattedItems = items.map((t) => ({
+    const formatted = items.map((t) => ({
       id: t.id,
       type: t.type,
       amount: t.amount,
@@ -206,9 +208,13 @@ export class TransactionService {
     return {
       success: true,
       message: 'OK',
-      data: { items: formattedItems, total, page, pageSize },
+      data: { items: formatted, total, page, pageSize },
     };
   }
+
+  // ----------------------------------------------------------
+  // UPDATE TRANSACTION + SUMMARY UPDATE
+  // ----------------------------------------------------------
 
   async updateTransaction(id: number, dto: UpdateTransactionDto) {
     return await this.dataSource.transaction(async (manager) => {
@@ -216,38 +222,47 @@ export class TransactionService {
         where: { id },
         relations: ['account', 'currency', 'creatorUser', 'category'],
       });
+
       if (!tx) return { success: false, message: 'Transaction not found' };
 
       const oldTx = { ...tx };
       let ledgerNeeded = false;
+
       const oldAmount = Number(tx.amount);
       const oldType = tx.type;
       const oldAccountId = tx.account.id;
 
-      // balance recalculation if amount/type changed
+      // BALANCE RECALCULATION
       if (
         (dto.amount && dto.amount !== tx.amount) ||
         (dto.type && dto.type !== tx.type)
       ) {
         ledgerNeeded = true;
+
         const balance = Number(
           await this.accountService.getBalance(oldAccountId),
         );
+
+        // revert old amount
         let newBalance =
           oldType === 'income' ? balance - oldAmount : balance + oldAmount;
+
+        // apply new amount
         const newAmount = Number(dto.amount ?? tx.amount);
         const newType = dto.type ?? tx.type;
+
         newBalance =
           newType === 'income'
             ? newBalance + newAmount
             : newBalance - newAmount;
+
         await this.accountService.updateBalance(
           oldAccountId,
           newBalance.toFixed(2),
         );
       }
 
-      // externalRefId unique check
+      // EXTERNAL REF CHECK
       if (dto.externalRefId && dto.externalRefId !== tx.externalRefId) {
         const exists = await manager.findOne(Transaction, {
           where: { externalRefId: dto.externalRefId },
@@ -257,7 +272,7 @@ export class TransactionService {
         tx.externalRefId = dto.externalRefId;
       }
 
-      // update allowed fields
+      // SIMPLE FIELD UPDATE
       const allowed = [
         'amount',
         'type',
@@ -271,15 +286,17 @@ export class TransactionService {
         if (dto[f] !== undefined) tx[f] = dto[f];
       });
 
-      // update relations
+      // RELATIONS
       if (dto.accountId) tx.account = { id: dto.accountId } as any;
       if (dto.categoryId) tx.category = { id: dto.categoryId } as any;
       if (dto.currencyCode) tx.currency = { code: dto.currencyCode } as any;
 
       const updated = await manager.save(tx);
 
+      // UPDATE SUMMARY TABLES
       await this.summaryWorkerService.handleTransactionUpdate(oldTx, updated);
 
+      // LEDGER ENTRY IF AMOUNT/TYPE CHANGED
       if (ledgerNeeded) {
         await this.ledgerService.createEntry(
           {
@@ -299,19 +316,27 @@ export class TransactionService {
     });
   }
 
+  // ----------------------------------------------------------
+  // DELETE TRANSACTION + SUMMARY DELETE
+  // ----------------------------------------------------------
+
   async deleteTransaction(id: number) {
     return await this.dataSource.transaction(async (manager) => {
       const tx = await manager.findOne(Transaction, {
         where: { id },
         relations: ['account', 'creatorUser'],
       });
+
       if (!tx) return { success: false, message: 'Transaction not found' };
 
       const oldAmount = Number(tx.amount);
       const oldType = tx.type;
+
       const balance = Number(
         await this.accountService.getBalance(tx.account.id),
       );
+
+      // restore balance (reverse transaction)
       const newBalance =
         oldType === 'income' ? balance - oldAmount : balance + oldAmount;
 
@@ -320,10 +345,13 @@ export class TransactionService {
         newBalance.toFixed(2),
       );
 
+      // REMOVE FROM SUMMARY
       await this.summaryWorkerService.handleTransactionDelete(tx);
 
+      // DELETE TRANSACTION
       await manager.delete(Transaction, id);
 
+      // LEDGER ENTRY FOR DELETE
       await this.ledgerService.createEntry(
         {
           accountId: tx.account.id,

@@ -81,7 +81,7 @@ export class AccountsService {
     // 🔹 Step 1: Fetch account with relations
     const account = await this.accountRepo.findOne({
       where: { id },
-      relations: ['type', 'currencyCode'],
+      relations: ['type', 'currency'],
     });
 
     if (!account) {

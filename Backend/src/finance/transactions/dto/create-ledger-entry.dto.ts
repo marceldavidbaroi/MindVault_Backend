@@ -17,7 +17,7 @@ export class CreateLedgerEntryDto {
   entryType: 'income' | 'expense';
 
   @IsPositive()
-  amount: number;
+  amount: string;
 
   @IsOptional()
   @IsString()

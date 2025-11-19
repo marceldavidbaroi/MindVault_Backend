@@ -18,6 +18,7 @@ export class YearlySummary {
 
   @ManyToOne(() => Account, (account) => account.yearlySummaries, {
     nullable: false,
+    onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'account_id' })
   account: Account;

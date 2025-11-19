@@ -18,6 +18,7 @@ export class WeeklySummary {
 
   @ManyToOne(() => Account, (account) => account.weeklySummaries, {
     nullable: false,
+    onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'account_id' })
   account: Account;

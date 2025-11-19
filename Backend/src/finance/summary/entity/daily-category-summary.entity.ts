@@ -19,6 +19,7 @@ export class DailyCategorySummary {
 
   @ManyToOne(() => Account, (account) => account.dailyCategorySummaries, {
     nullable: false,
+    onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'account_id' })
   account: Account;

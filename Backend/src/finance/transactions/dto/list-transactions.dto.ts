@@ -34,4 +34,21 @@ export class ListTransactionsFilterDto {
   @IsOptional()
   @Type(() => Number)
   pageSize?: number;
+
+  @IsOptional()
+  @IsIn([
+    'transactionDate',
+    'amount',
+    'type',
+    'status',
+    'externalRefId',
+    'id',
+    'createdAt',
+    'updatedAt',
+  ])
+  sortBy?: string;
+
+  @IsOptional()
+  @IsIn(['ASC', 'DESC'])
+  sortOrder?: 'ASC' | 'DESC';
 }

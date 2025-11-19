@@ -20,7 +20,10 @@ export class AccountLedger {
   @Column({ name: 'account_id' })
   accountId: number;
 
-  @ManyToOne(() => Account)
+  @ManyToOne(() => Account, {
+    nullable: true, // or false if required
+    onDelete: 'CASCADE', // automatically delete this row if the account is deleted
+  })
   @JoinColumn({ name: 'account_id' })
   account?: Account;
 

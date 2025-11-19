@@ -17,6 +17,7 @@ import { AccountUserRolesService } from 'src/finance/accounts/services/account-u
 import { ListTransactionsFilterDto } from '../dto/list-transactions.dto';
 import { SummaryWorkerService } from 'src/finance/summary/services/summary-worker.service';
 import { LedgerService } from './ledger.service';
+import { safeAdd, safeSubtract } from 'src/common/utils/decimal-balance';
 
 @Injectable()
 export class TransactionService {
@@ -80,19 +81,22 @@ export class TransactionService {
       const savedTx = await manager.save(tx);
 
       // UPDATE ACCOUNT BALANCE
-      const currentBalance = Number(
-        await this.accountService.getBalance(dto.accountId),
+      const currentBalance = await this.accountService.getBalance(
+        dto.accountId,
       );
-      const amount = Number(dto.amount);
+      // const amount = Number(dto.amount);
       const balance =
         dto.type === 'income'
-          ? currentBalance + amount
-          : currentBalance - amount;
+          ? safeAdd(currentBalance, dto.amount)
+          : safeSubtract(currentBalance, dto.amount);
 
-      await this.accountService.updateBalance(
+      console.log('balance', balance);
+
+      const res = await this.accountService.updateBalance(
         dto.accountId,
-        balance.toFixed(2),
+        balance,
       );
+      console.log('res', res.balance);
 
       // UPDATE SUMMARY TABLES
       await this.summaryWorkerService.handleTransaction(savedTx);
@@ -103,7 +107,7 @@ export class TransactionService {
           accountId: account.id,
           creatorId: user.id,
           entryType: dto.type,
-          amount,
+          amount: dto.amount,
           description: dto.description ?? `Transaction #${savedTx.id} created`,
           transactionId: savedTx.id,
         },
@@ -127,7 +131,6 @@ export class TransactionService {
   // ----------------------------------------------------------
   // LIST TRANSACTIONS
   // ----------------------------------------------------------
-
   async listTransactions(
     accountId: number,
     filters: ListTransactionsFilterDto,
@@ -148,6 +151,8 @@ export class TransactionService {
         't.recurring',
         't.recurringInterval',
         't.externalRefId',
+        't.createdAt',
+        't.updatedAt', // include this
         'account.id',
         'account.name',
         'category.id',
@@ -159,6 +164,7 @@ export class TransactionService {
       ])
       .where('account.id = :accountId', { accountId });
 
+    // filters
     if (filters.categoryId)
       qb.andWhere('category.id = :categoryId', {
         categoryId: filters.categoryId,
@@ -177,9 +183,26 @@ export class TransactionService {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 20;
 
-    qb.skip((page - 1) * pageSize)
-      .take(pageSize)
-      .orderBy('t.transactionDate', 'DESC');
+    // 👉 Sorting whitelist
+    const allowedSortColumns: Record<string, string> = {
+      transactionDate: 't.transactionDate',
+      createdAt: 't.createdAt',
+      updatedAt: 't.updatedAt',
+      amount: 't.amount',
+      type: 't.type',
+      status: 't.status',
+    };
+
+    const sortBy =
+      filters.sortBy && allowedSortColumns[filters.sortBy]
+        ? allowedSortColumns[filters.sortBy]
+        : 't.transactionDate';
+
+    const sortOrder = filters.sortOrder ?? 'DESC';
+
+    qb.orderBy(sortBy, sortOrder)
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
 
     const [items, total] = await qb.getManyAndCount();
 
@@ -193,6 +216,8 @@ export class TransactionService {
       recurring: t.recurring,
       recurringInterval: t.recurringInterval,
       externalRefId: t.externalRefId,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
       account: t.account ? { id: t.account.id, name: t.account.name } : null,
       category: t.category
         ? { id: t.category.id, name: t.category.name }
@@ -303,7 +328,7 @@ export class TransactionService {
             accountId: updated.account.id,
             creatorId: updated.creatorUser.id,
             entryType: updated.type,
-            amount: Number(updated.amount),
+            amount: updated.amount,
             description:
               dto.description ?? `Transaction #${updated.id} updated`,
             transactionId: updated.id,
@@ -357,7 +382,7 @@ export class TransactionService {
           accountId: tx.account.id,
           creatorId: tx.creatorUser.id,
           entryType: oldType === 'income' ? 'expense' : 'income',
-          amount: oldAmount,
+          amount: oldAmount.toString(),
           description: `Transaction #${id} deleted`,
           transactionId: id,
         },

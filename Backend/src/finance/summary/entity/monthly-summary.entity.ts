@@ -18,6 +18,7 @@ export class MonthlySummary {
 
   @ManyToOne(() => Account, (account) => account.monthlySummary, {
     nullable: false,
+    onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'account_id' })
   account: Account;

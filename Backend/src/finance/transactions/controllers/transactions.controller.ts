@@ -71,6 +71,27 @@ export class TransactionsController {
   })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'pageSize', required: false, type: Number })
+
+  // ⭐ NEW: Sorting
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: [
+      'transactionDate',
+      'createdAt',
+      'updatedAt',
+      'amount',
+      'type',
+      'status',
+    ],
+    description: 'Column to sort by (default: transactionDate)',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['ASC', 'DESC'],
+    description: 'Sort direction (default: DESC)',
+  })
   async listTransactions(
     @Param('accountId', ParseIntPipe) accountId: number,
     @Query() filters: ListTransactionsFilterDto,

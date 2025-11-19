@@ -47,26 +47,29 @@ export class LedgerService {
       transactionId,
     } = dto;
 
-    // Get balance AFTER this entry
-    const newBalance = await this.accountService.getBalance(accountId); // MUST await
+    let safeTransactionId: number | null = null;
+    if (transactionId) {
+      const exists = await this.transactionRepo.findOne({
+        where: { id: transactionId },
+      });
+      safeTransactionId = exists ? transactionId : null; // prevent FK violation
+    }
+
+    const newBalance = await this.accountService.getBalance(accountId);
 
     const ledger = repo.create({
       accountId,
       creatorId,
-      transactionId: transactionId ?? null,
+      transactionId: safeTransactionId,
       entryType,
-      amount: amount, // required for decimal columns
-      balanceAfter: newBalance, // correct: string
+      amount,
+      balanceAfter: newBalance,
       description,
     });
 
     const saved = await repo.save(ledger);
 
-    return {
-      success: true,
-      message: 'Ledger entry created successfully',
-      data: saved,
-    };
+    return { success: true, message: 'Ledger entry created', data: saved };
   }
 
   /**
@@ -78,12 +81,23 @@ export class LedgerService {
       where: { id: transactionId },
       relations: ['account', 'creatorUser'],
     });
-    if (!tx) throw new NotFoundException('Transaction not found');
+    if (!tx)
+      return this.createEntry(
+        {
+          accountId: 0, // optional, or skip entirely
+          creatorId: null,
+          entryType: 'expense', // fallback type
+          amount: '0',
+          description: `Deleted transaction #${transactionId}`,
+          transactionId: null,
+        },
+        manager,
+      );
 
     return this.createEntry(
       {
         accountId: tx.account.id,
-        creatorId: tx.creatorUser.id,
+        creatorId: tx.creatorUser?.id ?? null,
         entryType: tx.type,
         amount: tx.amount,
         description: tx.description,

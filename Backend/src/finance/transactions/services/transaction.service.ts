@@ -123,8 +123,13 @@ export class TransactionService {
   // ----------------------------------------------------------
 
   async getTransaction(id: number) {
-    const tx = await this.transactionRepo.findOne({ where: { id } });
+    const tx = await this.transactionRepo.findOne({
+      where: { id },
+      relations: ['account', 'creatorUser', 'category', 'currency'],
+    });
+
     if (!tx) return { success: false, message: 'Transaction not found' };
+
     return { success: true, message: 'OK', data: tx };
   }
 
@@ -241,6 +246,11 @@ export class TransactionService {
   // UPDATE TRANSACTION + SUMMARY UPDATE
   // ----------------------------------------------------------
 
+  // ---------------------------- UPDATE ----------------------------
+
+  // ----------------------------------------------------------
+  // UPDATE TRANSACTION + SUMMARY UPDATE
+  // ----------------------------------------------------------
   async updateTransaction(id: number, dto: UpdateTransactionDto) {
     return await this.dataSource.transaction(async (manager) => {
       const tx = await manager.findOne(Transaction, {
@@ -257,7 +267,9 @@ export class TransactionService {
       const oldType = tx.type;
       const oldAccountId = tx.account.id;
 
+      // -------------------------------
       // BALANCE RECALCULATION
+      // -------------------------------
       if (
         (dto.amount && dto.amount !== tx.amount) ||
         (dto.type && dto.type !== tx.type)
@@ -287,7 +299,9 @@ export class TransactionService {
         );
       }
 
+      // -------------------------------
       // EXTERNAL REF CHECK
+      // -------------------------------
       if (dto.externalRefId && dto.externalRefId !== tx.externalRefId) {
         const exists = await manager.findOne(Transaction, {
           where: { externalRefId: dto.externalRefId },
@@ -297,31 +311,39 @@ export class TransactionService {
         tx.externalRefId = dto.externalRefId;
       }
 
+      // -------------------------------
       // SIMPLE FIELD UPDATE
-      const allowed = [
-        'amount',
-        'type',
-        'description',
-        'transactionDate',
-        'status',
-        'recurring',
-        'recurringInterval',
-      ];
-      allowed.forEach((f) => {
-        if (dto[f] !== undefined) tx[f] = dto[f];
-      });
+      // -------------------------------
+      if (dto.amount !== undefined) tx.amount = dto.amount;
+      if (dto.type !== undefined) tx.type = dto.type;
+      if (dto.description !== undefined) tx.description = dto.description;
+      if (dto.transactionDate !== undefined)
+        tx.transactionDate = dto.transactionDate;
+      if (dto.status !== undefined) tx.status = dto.status;
+      if (dto.recurring !== undefined) tx.recurring = dto.recurring;
+      if (dto.recurringInterval !== undefined)
+        tx.recurringInterval = dto.recurringInterval;
 
+      // -------------------------------
       // RELATIONS
-      if (dto.accountId) tx.account = { id: dto.accountId } as any;
-      if (dto.categoryId) tx.category = { id: dto.categoryId } as any;
-      if (dto.currencyCode) tx.currency = { code: dto.currencyCode } as any;
+      // -------------------------------
+      if (dto.accountId !== undefined)
+        tx.account = { id: dto.accountId } as any;
+      if (dto.categoryId !== undefined)
+        tx.category = { id: dto.categoryId } as any;
+      if (dto.currencyCode !== undefined)
+        tx.currency = { code: dto.currencyCode } as any;
 
       const updated = await manager.save(tx);
 
+      // -------------------------------
       // UPDATE SUMMARY TABLES
+      // -------------------------------
       await this.summaryWorkerService.handleTransactionUpdate(oldTx, updated);
 
-      // LEDGER ENTRY IF AMOUNT/TYPE CHANGED
+      // -------------------------------
+      // LEDGER ENTRY (IMMUTABLE)
+      // -------------------------------
       if (ledgerNeeded) {
         await this.ledgerService.createEntry(
           {
@@ -344,7 +366,6 @@ export class TransactionService {
   // ----------------------------------------------------------
   // DELETE TRANSACTION + SUMMARY DELETE
   // ----------------------------------------------------------
-
   async deleteTransaction(id: number) {
     return await this.dataSource.transaction(async (manager) => {
       const tx = await manager.findOne(Transaction, {
@@ -354,35 +375,45 @@ export class TransactionService {
 
       if (!tx) return { success: false, message: 'Transaction not found' };
 
-      const oldAmount = Number(tx.amount);
+      const oldAmount = tx.amount;
       const oldType = tx.type;
+      const accountId = tx.account.id;
 
-      const balance = Number(
-        await this.accountService.getBalance(tx.account.id),
-      );
+      // -------------------------------
+      // RESTORE BALANCE
+      // -------------------------------
+      const currentBalance = await this.accountService.getBalance(accountId);
+      const restoredBalance =
+        oldType === 'income'
+          ? safeSubtract(currentBalance, oldAmount)
+          : safeAdd(currentBalance, oldAmount);
 
-      // restore balance (reverse transaction)
-      const newBalance =
-        oldType === 'income' ? balance - oldAmount : balance + oldAmount;
+      await this.accountService.updateBalance(accountId, restoredBalance);
 
-      await this.accountService.updateBalance(
-        tx.account.id,
-        newBalance.toFixed(2),
-      );
-
+      // -------------------------------
       // REMOVE FROM SUMMARY
+      // -------------------------------
       await this.summaryWorkerService.handleTransactionDelete(tx);
 
-      // DELETE TRANSACTION
-      await manager.delete(Transaction, id);
+      // -------------------------------
+      // DELETE LEDGER ENTRIES FOR THIS TX
+      // -------------------------------
+      await manager.delete('account_ledger', { transactionId: tx.id });
 
-      // LEDGER ENTRY FOR DELETE
+      // -------------------------------
+      // DELETE TRANSACTION
+      // -------------------------------
+      await manager.delete(Transaction, { id: tx.id });
+
+      // -------------------------------
+      // LEDGER ENTRY FOR DELETE (REVERSE)
+      // -------------------------------
       await this.ledgerService.createEntry(
         {
-          accountId: tx.account.id,
+          accountId,
           creatorId: tx.creatorUser.id,
           entryType: oldType === 'income' ? 'expense' : 'income',
-          amount: oldAmount.toString(),
+          amount: oldAmount,
           description: `Transaction #${id} deleted`,
           transactionId: id,
         },

@@ -11,7 +11,7 @@ export class CreateLedgerEntryDto {
   accountId: number;
 
   @IsNumber()
-  creatorId: number;
+  creatorId: number | null;
 
   @IsEnum(['income', 'expense'])
   entryType: 'income' | 'expense';
@@ -25,5 +25,5 @@ export class CreateLedgerEntryDto {
 
   @IsOptional()
   @IsNumber()
-  transactionId?: number;
+  transactionId?: number | null;
 }

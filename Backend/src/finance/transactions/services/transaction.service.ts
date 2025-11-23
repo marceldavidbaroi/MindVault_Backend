@@ -4,8 +4,12 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { Transaction } from '../entities/transaction.entity';
+import { Repository, DataSource, DeepPartial } from 'typeorm';
+import {
+  RecurringInterval,
+  Transaction,
+  TransactionStatus,
+} from '../entities/transaction.entity';
 import { CreateTransactionDto } from '../dto/create-transaction.dto';
 import { UpdateTransactionDto } from '../dto/update-transaction.dto';
 import { User } from 'src/auth/entities/user.entity';
@@ -18,6 +22,7 @@ import { ListTransactionsFilterDto } from '../dto/list-transactions.dto';
 import { SummaryWorkerService } from 'src/finance/summary/services/summary-worker.service';
 import { LedgerService } from './ledger.service';
 import { safeAdd, safeSubtract } from 'src/common/utils/decimal-balance';
+import { BulkCreateTransactionDto } from '../dto/bulk-create-transaction.dto';
 
 @Injectable()
 export class TransactionService {
@@ -115,6 +120,104 @@ export class TransactionService {
       );
 
       return { success: true, message: 'Transaction created', data: savedTx };
+    });
+  }
+
+  async createBulkTransactionsOptimized(
+    userId: number,
+    dto: BulkCreateTransactionDto,
+  ) {
+    return await this.dataSource.transaction(async (manager) => {
+      const user: User = await this.verifyUserService.verify(userId);
+      const account = await this.accountUserRolesService.getUserRoleForAccount(
+        userId,
+        dto.accountId,
+      );
+      const currency = dto.currencyCode
+        ? await this.currencyService.verifyCurrency(dto.currencyCode)
+        : undefined;
+
+      const results: Transaction[] = [];
+
+      for (const item of dto.transactions) {
+        const category = item.categoryId
+          ? await this.categoryService.verifyCategory(item.categoryId)
+          : undefined;
+
+        if (item.externalRefId) {
+          const existing = await manager.findOne(Transaction, {
+            where: { externalRefId: item.externalRefId },
+          });
+          if (existing)
+            throw new BadRequestException(
+              `externalRefId ${item.externalRefId} must be unique`,
+            );
+        }
+
+        const tx: DeepPartial<Transaction> = {
+          account: account as any,
+          creatorUser: user,
+          category: category as any,
+          type: dto.type ?? 'expense',
+          amount: item.amount.toString(), // ensure string for decimal
+          currency: currency as any,
+          transactionDate: item.transactionDate
+            ? item.transactionDate
+            : new Date().toISOString().split('T')[0],
+          description: dto.description,
+          status:
+            dto.status &&
+            ['pending', 'cleared', 'void', 'failed'].includes(dto.status)
+              ? (dto.status as TransactionStatus)
+              : 'pending',
+          externalRefId: item.externalRefId,
+          recurring: dto.recurring ?? false,
+          recurringInterval:
+            dto.recurringInterval &&
+            ['daily', 'weekly', 'monthly', 'yearly'].includes(
+              dto.recurringInterval,
+            )
+              ? (dto.recurringInterval as RecurringInterval)
+              : undefined,
+        };
+
+        const savedTx = await manager.save(Transaction, tx);
+
+        // Update account balance
+        const currentBalance = await this.accountService.getBalance(
+          dto.accountId,
+        );
+        const balance =
+          tx.type === 'income'
+            ? safeAdd(currentBalance, item.amount)
+            : safeSubtract(currentBalance, item.amount);
+
+        await this.accountService.updateBalance(dto.accountId, balance);
+
+        // Update summary
+        await this.summaryWorkerService.handleTransaction(savedTx);
+
+        // Ledger entry
+        await this.ledgerService.createEntry(
+          {
+            accountId: account.id,
+            creatorId: user.id,
+            entryType: tx.type as 'income' | 'expense', // now strictly 'income' | 'expense'
+            amount: item.amount,
+            description: tx.description ?? `Transaction #${savedTx.id} created`,
+            transactionId: savedTx.id,
+          },
+          manager,
+        );
+
+        results.push(savedTx);
+      }
+
+      return {
+        success: true,
+        message: 'Bulk transactions created',
+        data: results,
+      };
     });
   }
 

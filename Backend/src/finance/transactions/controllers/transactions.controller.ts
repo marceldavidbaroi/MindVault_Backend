@@ -1,18 +1,19 @@
 import {
   Controller,
+  UseGuards,
   Post,
-  Body,
-  Get,
-  Query,
-  Param,
-  Put,
-  Delete,
-  ParseIntPipe,
   UsePipes,
   ValidationPipe,
+  Body,
+  Get,
+  Param,
+  ParseIntPipe,
+  Query,
+  Put,
+  Delete,
   HttpCode,
-  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
   ApiOperation,
@@ -20,13 +21,13 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { TransactionService } from '../services/transaction.service';
-import { CreateTransactionDto } from '../dto/create-transaction.dto';
-import { UpdateTransactionDto } from '../dto/update-transaction.dto';
-import { ListTransactionsFilterDto } from '../dto/list-transactions.dto';
-import { GetUser } from 'src/auth/get-user.decorator';
 import { User } from 'src/auth/entities/user.entity';
-import { AuthGuard } from '@nestjs/passport';
+import { GetUser } from 'src/auth/get-user.decorator';
+import { BulkCreateTransactionDto } from '../dto/bulk-create-transaction.dto'; // make sure this exists
+import { CreateTransactionDto } from '../dto/create-transaction.dto';
+import { ListTransactionsFilterDto } from '../dto/list-transactions.dto';
+import { UpdateTransactionDto } from '../dto/update-transaction.dto';
+import { TransactionService } from '../services/transaction.service';
 
 @ApiTags('transactions')
 @Controller('transactions')
@@ -34,6 +35,9 @@ import { AuthGuard } from '@nestjs/passport';
 export class TransactionsController {
   constructor(private readonly txService: TransactionService) {}
 
+  // ----------------------
+  // Single Transaction
+  // ----------------------
   @Post()
   @ApiOperation({ summary: 'Create a transaction' })
   @ApiResponse({ status: 201, description: 'Transaction created' })
@@ -42,6 +46,23 @@ export class TransactionsController {
     return this.txService.createTransaction(user.id, dto);
   }
 
+  // ----------------------
+  // Bulk Transactions
+  // ----------------------
+  @Post('bulk')
+  @ApiOperation({ summary: 'Create multiple transactions at once' })
+  @ApiResponse({ status: 201, description: 'Bulk transactions created' })
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async createBulk(
+    @GetUser() user: User,
+    @Body() dto: BulkCreateTransactionDto,
+  ) {
+    return this.txService.createBulkTransactionsOptimized(user.id, dto);
+  }
+
+  // ----------------------
+  // List Transactions
+  // ----------------------
   @Get(':accountId/transactions')
   @ApiOperation({ summary: 'List transactions for an account' })
   @ApiParam({
@@ -71,8 +92,6 @@ export class TransactionsController {
   })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'pageSize', required: false, type: Number })
-
-  // ⭐ NEW: Sorting
   @ApiQuery({
     name: 'sortBy',
     required: false,
@@ -99,6 +118,9 @@ export class TransactionsController {
     return this.txService.listTransactions(accountId, filters);
   }
 
+  // ----------------------
+  // Get Single Transaction
+  // ----------------------
   @Get(':id')
   @ApiOperation({ summary: 'Get a single transaction' })
   @ApiParam({ name: 'id' })
@@ -106,6 +128,9 @@ export class TransactionsController {
     return this.txService.getTransaction(id);
   }
 
+  // ----------------------
+  // Update Transaction
+  // ----------------------
   @Put(':id')
   @ApiOperation({ summary: 'Update a transaction' })
   async update(
@@ -115,6 +140,9 @@ export class TransactionsController {
     return this.txService.updateTransaction(id, dto);
   }
 
+  // ----------------------
+  // Delete Transaction
+  // ----------------------
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a transaction' })
   @HttpCode(200)

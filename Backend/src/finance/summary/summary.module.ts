@@ -14,8 +14,14 @@ import { YearlySummaryService } from './services/yearly-summary.service';
 import { YearlySummary } from './entity/yearly-summary.entity';
 import { DailyCategorySummary } from './entity/daily-category-summary.entity';
 import { WeeklySummaryService } from './services/weekly-summary.service';
-import { SummariesController } from './summary.controller';
+import { SummariesController } from './controller/summary.controller';
 import { MasterComparisonSummaryService } from './services/master-comparison-summary.service';
+import { CategorySummaryController } from './controller/category-summary.controller';
+import { DailySummaryController } from './controller/daily-summary.controller';
+import { MonthlySummaryController } from './controller/monthly-summary.controller';
+import { WeeklySummaryController } from './controller/weekly-summary.controller';
+import { YearlySummaryController } from './controller/yearly-summary.controller';
+import { TrendInsightController } from './controller/trend-insight.controller';
 
 @Module({
   imports: [
@@ -39,7 +45,15 @@ import { MasterComparisonSummaryService } from './services/master-comparison-sum
     WeeklySummaryService,
     MasterComparisonSummaryService,
   ],
-  controllers: [SummariesController],
+  controllers: [
+    SummariesController,
+    CategorySummaryController,
+    DailySummaryController,
+    MonthlySummaryController,
+    WeeklySummaryController,
+    YearlySummaryController,
+    TrendInsightController,
+  ],
   exports: [SummaryWorkerService], // so other modules can use it
 })
 export class SummaryModule {}

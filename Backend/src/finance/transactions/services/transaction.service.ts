@@ -231,9 +231,18 @@ export class TransactionService {
       relations: ['account', 'creatorUser', 'category', 'currency'],
     });
 
-    if (!tx) return { success: false, message: 'Transaction not found' };
+    if (!tx) {
+      return {
+        success: false,
+        message: `Transaction with ID ${id} not found.`,
+      };
+    }
 
-    return { success: true, message: 'OK', data: tx };
+    return {
+      success: true,
+      message: `Transaction with ID ${id} fetched successfully.`,
+      data: tx,
+    };
   }
 
   // ----------------------------------------------------------
@@ -340,8 +349,9 @@ export class TransactionService {
 
     return {
       success: true,
-      message: 'OK',
-      data: { items: formatted, total, page, pageSize },
+      message: 'Transactions Fetched Successfully',
+      data: formatted,
+      meta: { total, page, pageSize },
     };
   }
 

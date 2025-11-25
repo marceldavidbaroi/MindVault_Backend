@@ -7,9 +7,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { MasterComparisonSummaryService } from './services/master-comparison-summary.service';
+import { MasterComparisonSummaryService } from '../services/master-comparison-summary.service';
 import { AuthGuard } from '@nestjs/passport';
-import { CategorySummaryService } from './services/category-summary.service';
+import { CategorySummaryService } from '../services/category-summary.service';
 
 @ApiTags('summaries')
 @Controller('summaries')

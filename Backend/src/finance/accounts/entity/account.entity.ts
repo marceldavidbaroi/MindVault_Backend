@@ -20,6 +20,7 @@ import { Currency } from 'src/finance/currency/entity/currency.entity';
 import { DailyCategorySummary } from 'src/finance/summary/entity/daily-category-summary.entity';
 import { WeeklySummary } from 'src/finance/summary/entity/weekly-summary.entity';
 import { YearlySummary } from 'src/finance/summary/entity/yearly-summary.entity';
+import { SavingsGoal } from 'src/finance/savings-goals/entity/savings-goals.entity';
 
 @Entity('accounts')
 export class Account {
@@ -100,4 +101,7 @@ export class Account {
 
   @OneToMany(() => YearlySummary, (yearlySummary) => yearlySummary.account)
   yearlySummaries: YearlySummary[];
+
+  @OneToOne(() => SavingsGoal, (goal) => goal.account)
+  savingsGoal: SavingsGoal;
 }

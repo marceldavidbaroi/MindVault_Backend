@@ -12,6 +12,7 @@ import {
   Put,
   Delete,
   HttpCode,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -148,5 +149,41 @@ export class TransactionsController {
   @HttpCode(200)
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.txService.deleteTransaction(id);
+  }
+
+  // ----------------------
+  // Bank Statement Endpoint
+  // ----------------------
+  @Get(':accountId/statement')
+  @ApiOperation({ summary: 'Get bank statement for an account' })
+  @ApiParam({
+    name: 'accountId',
+    description: 'ID of the account',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'from',
+    required: true,
+    type: String,
+    description: 'Start date YYYY-MM-DD',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: true,
+    type: String,
+    description: 'End date YYYY-MM-DD',
+  })
+  async getStatement(
+    @Param('accountId', ParseIntPipe) accountId: number,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    // Validate from/to dates
+    if (!from || !to) {
+      throw new BadRequestException(
+        'Both "from" and "to" query parameters are required',
+      );
+    }
+    return this.txService.getOptimizedStatement(accountId, from, to);
   }
 }

@@ -15,6 +15,8 @@ import { SummaryModule } from '../summary/summary.module';
 import { AccountLedger } from './entities/ledger.entity';
 import { LedgerService } from './services/ledger.service';
 import { Account } from '../accounts/entity/account.entity';
+import { MonthlySummary } from '../summary/entity/monthly-summary.entity';
+import { YearlySummary } from '../summary/entity/yearly-summary.entity';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { Account } from '../accounts/entity/account.entity';
       RecurringTransactionSchedule,
       AccountLedger,
       Account,
+      MonthlySummary,
+      YearlySummary,
     ]),
     // account module is used for accountService
     AccountsModule,

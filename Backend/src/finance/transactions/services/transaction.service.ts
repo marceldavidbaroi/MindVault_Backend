@@ -23,6 +23,8 @@ import { SummaryWorkerService } from 'src/finance/summary/services/summary-worke
 import { LedgerService } from './ledger.service';
 import { safeAdd, safeSubtract } from 'src/common/utils/decimal-balance';
 import { BulkCreateTransactionDto } from '../dto/bulk-create-transaction.dto';
+import { MonthlySummary } from 'src/finance/summary/entity/monthly-summary.entity';
+import { YearlySummary } from 'src/finance/summary/entity/yearly-summary.entity';
 
 @Injectable()
 export class TransactionService {
@@ -37,6 +39,11 @@ export class TransactionService {
     private readonly summaryWorkerService: SummaryWorkerService,
     private readonly accountService: AccountsService,
     private readonly ledgerService: LedgerService,
+    @InjectRepository(MonthlySummary)
+    private readonly monthlySummaryRepo: Repository<MonthlySummary>,
+
+    @InjectRepository(YearlySummary)
+    private readonly yearlySummaryRepo: Repository<YearlySummary>,
   ) {}
 
   // ----------------------------------------------------------
@@ -535,5 +542,94 @@ export class TransactionService {
 
       return { success: true, message: 'Transaction deleted' };
     });
+  }
+  async getOptimizedStatement(accountId: number, from: string, to: string) {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    // --------------------------
+    // 1️⃣ Opening Balance
+    // --------------------------
+    // a) Years before start year
+    const yearlyBefore = await this.yearlySummaryRepo
+      .createQueryBuilder('y')
+      .select(
+        'COALESCE(SUM(y.totalIncome)::float - SUM(y.totalExpense)::float, 0)',
+        'balance',
+      )
+      .where('y.account_id = :accountId', { accountId })
+      .andWhere('y.year < :fromYear', { fromYear: fromDate.getFullYear() })
+      .getRawOne();
+
+    // b) Months before start month in start year
+    const monthlyBefore = await this.monthlySummaryRepo
+      .createQueryBuilder('m')
+      .select(
+        'COALESCE(SUM(m.totalIncome)::float - SUM(m.totalExpense)::float, 0)',
+        'balance',
+      )
+      .where('m.account_id = :accountId', { accountId })
+      .andWhere('m.year = :year AND m.month < :month', {
+        year: fromDate.getFullYear(),
+        month: fromDate.getMonth() + 1,
+      })
+      .getRawOne();
+
+    // c) Optional: weeks before start week (for very granular)
+    // const weeklyBefore = ...
+
+    let openingBalance =
+      parseFloat(yearlyBefore.balance) + parseFloat(monthlyBefore.balance);
+
+    // --------------------------
+    // 2️⃣ Transactions in range
+    // --------------------------
+    const transactions = await this.transactionRepo
+      .createQueryBuilder('t')
+      .leftJoin('t.category', 'category')
+      .leftJoin('t.currency', 'currency')
+      .select([
+        't.id',
+        't.type',
+        't.amount',
+        't.transactionDate',
+        't.description',
+        't.status',
+        'category.id',
+        'category.name',
+        'currency.code',
+        'currency.symbol',
+      ])
+      .where('t.account_id = :accountId', { accountId })
+      .andWhere('t.transactionDate BETWEEN :from AND :to', { from, to })
+      .orderBy('t.transactionDate', 'ASC')
+      .addOrderBy('t.id', 'ASC')
+      .getMany();
+
+    // --------------------------
+    // 3️⃣ Calculate running balance
+    // --------------------------
+    let runningBalance = openingBalance;
+    const formattedTxs = transactions.map((t) => {
+      runningBalance +=
+        t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount);
+      return {
+        ...t,
+        amount: parseFloat(t.amount),
+        runningBalance: runningBalance.toFixed(2),
+      };
+    });
+
+    const closingBalance = runningBalance;
+
+    return {
+      success: true,
+      message: 'Optimized statement generated successfully',
+      data: {
+        openingBalance: openingBalance.toFixed(2),
+        transactions: formattedTxs,
+        closingBalance: closingBalance.toFixed(2),
+      },
+    };
   }
 }

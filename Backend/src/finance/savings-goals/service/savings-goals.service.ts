@@ -1,35 +1,35 @@
 import {
   Injectable,
   NotFoundException,
+  ForbiddenException,
   forwardRef,
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Account } from 'src/finance/accounts/entity/account.entity';
-import { AccountsService } from 'src/finance/accounts/services/accounts.service';
-import { User } from 'src/auth/entities/user.entity';
-import { CreateAccountDto } from 'src/finance/accounts/dto/create-account.dto';
-import { AccountUserRolesService } from 'src/finance/accounts/services/account-user-roles.service.service'; // Added
 import { SavingsGoal } from '../entity/savings-goals.entity';
 import { CreateSavingsGoalDto } from '../dto/savings-goal-creation.dto';
+import { UpdateSavingsGoalDto } from '../dto/savings-goal-update.dto';
+import { User } from 'src/auth/entities/user.entity';
+import { AccountsService } from 'src/finance/accounts/services/accounts.service';
+import { AccountUserRolesService } from 'src/finance/accounts/services/account-user-roles.service.service';
 
 @Injectable()
 export class SavingsGoalsService {
   constructor(
     @InjectRepository(SavingsGoal)
     private savingsGoalRepository: Repository<SavingsGoal>,
+
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
-    // Inject AccountUserRolesService to check user access to goal accounts
+
     @Inject(forwardRef(() => AccountUserRolesService))
     private accountUserRolesService: AccountUserRolesService,
   ) {}
 
-  /**
-   * Creates a dedicated Account and links it to a new SavingsGoal record.
-   * Progress tracking is handled by the Account's balance.
-   */
+  // -------------------------------------------------
+  // CREATE GOAL
+  // -------------------------------------------------
   async createGoal(
     user: User,
     dto: CreateSavingsGoalDto,
@@ -43,83 +43,131 @@ export class SavingsGoalsService {
       purpose,
     } = dto;
 
-    // 1. Create the dedicated Account using the AccountsService
-    const accountDto: CreateAccountDto = {
-      name: `Goal: ${name}`, // Use a clear prefix for goal accounts
-      description: purpose || `Dedicated account for savings goal: ${name}`, // Use purpose for the account description
-      currencyCode: currencyCode,
-      initialBalance: 0, // Start the balance at zero (assuming string '0.00' is expected for balance/initialBalance fields)
-      accountTypeId: accountTypeId,
-    };
+    // Create account for goal
+    const account = await this.accountsService.createAccount(user, {
+      name: `Goal: ${name}`,
+      description: purpose || `Savings goal: ${name}`,
+      currencyCode,
+      initialBalance: 0,
+      accountTypeId,
+    });
 
-    // The AccountsService handles currency and account type validation, and saving the account.
-    const savedAccount: Account = await this.accountsService.createAccount(
-      user,
-      accountDto,
-    );
-
-    // 2. Create the SavingsGoal record, linking it to the new Account
     const newGoal = this.savingsGoalRepository.create({
-      name: name,
-      purpose: purpose, // Map the new purpose field
+      name,
+      purpose,
       target_amount: targetAmount,
       target_date: targetDate,
-      account: savedAccount, // Link the new Account entity
+      account,
       status: 'active',
     });
 
-    const savedGoal = await this.savingsGoalRepository.save(newGoal);
-
-    // Note: Atomicity is sequential. If goal saving fails, the account remains and may need cleanup.
-    return savedGoal;
+    return await this.savingsGoalRepository.save(newGoal);
   }
 
-  /**
-   * Retrieves a list of all savings goals a user is associated with via account roles.
-   */
+  // -------------------------------------------------
+  // LIST GOALS FOR USER
+  // -------------------------------------------------
   async listUserGoals(user: User): Promise<SavingsGoal[]> {
-    // 1. Find all accounts the user has access to (via roles).
     const userRoles =
       await this.accountUserRolesService.getUserAccountsWithRoles(user);
 
-    if (userRoles.length === 0) {
-      return [];
-    }
+    if (userRoles.length === 0) return [];
 
-    // 2. Extract the IDs of all accessible accounts.
-    const accountIds = userRoles.map((role) => role.account.id);
+    const accountIds = userRoles.map((r) => r.account.id);
 
-    // 3. Find SavingsGoals where the linked account_id is in the list of accessible accounts.
-    const goals = await this.savingsGoalRepository
+    return await this.savingsGoalRepository
       .createQueryBuilder('goal')
       .innerJoin('goal.account', 'account')
-      .leftJoinAndSelect('goal.account', 'accountDetail') // Select account details
-      .leftJoinAndSelect('accountDetail.currency', 'currency') // Select currency for context
+      .leftJoinAndSelect('goal.account', 'acc')
+      .leftJoinAndSelect('acc.currency', 'currency')
       .where('account.id IN (:...accountIds)', { accountIds })
       .getMany();
-
-    return goals;
   }
 
-  // Retrieves the goal and its progress. Progress is simply the Account balance.
+  // -------------------------------------------------
+  // GET PROGRESS
+  // -------------------------------------------------
   async getGoalProgress(
     goalId: number,
   ): Promise<{ goal: SavingsGoal; progress: string }> {
     const goal = await this.savingsGoalRepository.findOne({
       where: { id: goalId },
-      relations: ['account', 'account.currency'], // Load currency for full context
+      relations: ['account', 'account.currency'],
     });
 
-    if (!goal) {
-      throw new NotFoundException(`Savings Goal with ID ${goalId} not found`);
+    if (!goal) throw new NotFoundException('Goal not found');
+
+    const progress = goal.account.balance;
+    return { goal, progress };
+  }
+
+  // -------------------------------------------------
+  // UPDATE GOAL
+  // -------------------------------------------------
+  async updateGoal(
+    user: User,
+    goalId: number,
+    dto: UpdateSavingsGoalDto,
+  ): Promise<SavingsGoal> {
+    const goal = await this.savingsGoalRepository.findOne({
+      where: { id: goalId },
+      relations: ['account'],
+    });
+
+    if (!goal) throw new NotFoundException('Goal not found');
+
+    // --- Access check ---
+    const hasAccess = await this.accountUserRolesService.findOne(
+      goal.account.id,
+      user.id,
+    );
+    if (!hasAccess) throw new ForbiddenException('No access to this goal');
+
+    // Update goal fields
+    if (dto.name) goal.name = dto.name;
+    if (dto.purpose) goal.purpose = dto.purpose;
+    if (dto.targetAmount !== undefined) goal.target_amount = dto.targetAmount;
+    if (dto.targetDate) goal.target_date = dto.targetDate;
+
+    // If name or purpose changed → update account metadata
+    if (dto.name || dto.purpose) {
+      await this.accountsService.updateAccount(
+        goal.account.id,
+        {
+          name: `Goal: ${goal.name}`,
+          description: goal.purpose,
+        },
+        user,
+      );
     }
 
-    // TODO: Add a check here to ensure the requesting user has access to the linked account.
-    // E.g., const hasAccess = await this.accountUserRolesService.findOne(goal.account.id, userId);
+    return await this.savingsGoalRepository.save(goal);
+  }
 
-    // The saved amount is read directly from the linked Account's balance column
-    const progress = goal.account.balance;
+  // -------------------------------------------------
+  // DELETE GOAL
+  // -------------------------------------------------
+  async deleteGoal(user: User, goalId: number): Promise<{ success: boolean }> {
+    const goal = await this.savingsGoalRepository.findOne({
+      where: { id: goalId },
+      relations: ['account'],
+    });
 
-    return { goal, progress };
+    if (!goal) throw new NotFoundException('Goal not found');
+
+    // --- Access check ---
+    const hasAccess = await this.accountUserRolesService.findOne(
+      goal.account.id,
+      user.id,
+    );
+    if (!hasAccess) throw new ForbiddenException('No access to this goal');
+
+    // Remove goal record
+    await this.savingsGoalRepository.remove(goal);
+
+    // ALSO delete the linked account
+    await this.accountsService.deleteAccount(goal.account.id, user);
+
+    return { success: true };
   }
 }

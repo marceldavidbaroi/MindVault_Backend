@@ -67,7 +67,7 @@ export class SavingsGoalsService {
   // -------------------------------------------------
   // LIST GOALS FOR USER
   // -------------------------------------------------
-  async listUserGoals(user: User): Promise<SavingsGoal[]> {
+  async listUserGoals(user: User): Promise<any[]> {
     const userRoles =
       await this.accountUserRolesService.getUserAccountsWithRoles(user);
 
@@ -75,13 +75,46 @@ export class SavingsGoalsService {
 
     const accountIds = userRoles.map((r) => r.account.id);
 
-    return await this.savingsGoalRepository
+    const goals = await this.savingsGoalRepository
       .createQueryBuilder('goal')
       .innerJoin('goal.account', 'account')
       .leftJoinAndSelect('goal.account', 'acc')
       .leftJoinAndSelect('acc.currency', 'currency')
+      .leftJoinAndSelect('acc.owner', 'owner')
+      .leftJoinAndSelect('acc.type', 'type')
       .where('account.id IN (:...accountIds)', { accountIds })
       .getMany();
+
+    // ---- CLEAN RESPONSE ----
+    return goals.map((g) => ({
+      id: g.id,
+      name: g.name,
+      purpose: g.purpose,
+      target_amount: g.target_amount,
+      target_date: g.target_date,
+      status: g.status,
+
+      account: {
+        id: g.account.id,
+        name: g.account.name,
+        balance: g.account.balance,
+        ownerId: g.account.ownerId,
+
+        currency: {
+          code: g.account.currency.code,
+          symbol: g.account.currency.symbol,
+        },
+        type: {
+          id: g.account.type.id,
+          name: g.account.type.name,
+        },
+
+        owner: {
+          id: g.account.owner.id,
+          username: g.account.owner.username,
+        },
+      },
+    }));
   }
 
   // -------------------------------------------------

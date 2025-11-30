@@ -128,7 +128,28 @@ export class AccountsController {
     const account = await this.accountsService.getAccount(id, user);
     return { success: true, message: 'Account fetched', data: account };
   }
+  // ------------------ New Endpoint ------------------
+  @Get(':id/role')
+  @ApiOperation({ summary: 'Get the current user role for an account' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Role fetched successfully.',
+  })
+  async getMyRole(
+    @GetUser() user: User,
+    @Param('id', ParseIntPipe) accountId: number,
+  ): Promise<ApiResponse<{ roleName: string }>> {
+    const roleName = await this.accountUserRolesService.currentUserRole(
+      accountId,
+      user.id,
+    );
 
+    return {
+      success: true,
+      message: 'User role fetched successfully',
+      data: { roleName },
+    };
+  }
   // --------- Account Types ---------
 
   @Get('/types/all')

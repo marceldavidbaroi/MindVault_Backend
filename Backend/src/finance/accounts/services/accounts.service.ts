@@ -51,9 +51,18 @@ export class AccountsService {
     user: User,
   ): Promise<Account> {
     const account = await this.getAccountByIdAndUser(id, user);
-
-    // Update primitive fields
-    if (dto.name) account.name = dto.name;
+    const userRole = await this.accountUserRolesService.findOne(
+      account.id,
+      user.id,
+    );
+    if (userRole.role.name !== 'owner' && userRole.role.name !== 'admin') {
+      throw new ForbiddenException(
+        'You do not have permission to update this account.',
+      );
+    }
+    if (dto.name)
+      // Update primitive fields
+      account.name = dto.name;
     if (account.description) account.description = dto.description ?? null;
 
     // Update currency relation
@@ -74,6 +83,16 @@ export class AccountsService {
 
   async deleteAccount(id: number, user: User): Promise<void> {
     const account = await this.getAccountByIdAndUser(id, user);
+    const userRole = await this.accountUserRolesService.findOne(
+      account.id,
+      user.id,
+    );
+    if (userRole.role.name !== 'owner' && userRole.role.name !== 'admin') {
+      throw new ForbiddenException(
+        'You do not have permission to update this account.',
+      );
+    }
+
     await this.accountRepo.remove(account);
   }
 

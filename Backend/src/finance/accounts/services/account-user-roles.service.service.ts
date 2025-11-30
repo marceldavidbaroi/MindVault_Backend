@@ -45,6 +45,11 @@ export class AccountUserRolesService {
     return accountUserRole;
   }
 
+  async currentUserRole(accountId: number, userId: number): Promise<string> {
+    const accountUserRole = await this.findOne(accountId, userId);
+    return accountUserRole.role.name;
+  }
+
   async assignOwnerRole(user: User, account: Account) {
     const ownerRole = await this.rolesService.findOne(1);
 
@@ -78,6 +83,13 @@ export class AccountUserRolesService {
     if (dto.roleId === 1) {
       throw new BadRequestException(
         'Cannot assign Owner role using this method. Use assignOwnerRole or transferOwnership.',
+      );
+    }
+
+    const userRole = await this.findOne(accountId, owner.id);
+    if (userRole.role.name !== 'owner' && userRole.role.name !== 'admin') {
+      throw new ForbiddenException(
+        'You do not have permission to update this account.',
       );
     }
 

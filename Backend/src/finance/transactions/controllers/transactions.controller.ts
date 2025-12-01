@@ -135,10 +135,11 @@ export class TransactionsController {
   @Put(':id')
   @ApiOperation({ summary: 'Update a transaction' })
   async update(
+    @GetUser() user: User,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTransactionDto,
   ) {
-    return this.txService.updateTransaction(id, dto);
+    return this.txService.updateTransaction(user.id, id, dto);
   }
 
   // ----------------------
@@ -147,8 +148,8 @@ export class TransactionsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a transaction' })
   @HttpCode(200)
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.txService.deleteTransaction(id);
+  async remove(@GetUser() user: User, @Param('id', ParseIntPipe) id: number) {
+    return this.txService.deleteTransaction(user.id, id);
   }
 
   // ----------------------

@@ -46,6 +46,15 @@ export class TransactionService {
     private readonly yearlySummaryRepo: Repository<YearlySummary>,
   ) {}
 
+  private async verifyAccountPermission(userId: number, accountId: number) {
+    const userRole = await this.accountUserRolesService.getUserRoleForAccount(
+      userId,
+      accountId,
+    );
+
+    return userRole;
+  }
+
   // ----------------------------------------------------------
   // CREATE TRANSACTION
   // ----------------------------------------------------------
@@ -53,6 +62,7 @@ export class TransactionService {
   async createTransaction(userId: number, dto: CreateTransactionDto) {
     return await this.dataSource.transaction(async (manager) => {
       const user: User = await this.verifyUserService.verify(userId);
+      await this.verifyAccountPermission(userId, dto.accountId);
 
       const account = await this.accountUserRolesService.getUserRoleForAccount(
         userId,
@@ -371,7 +381,11 @@ export class TransactionService {
   // ----------------------------------------------------------
   // UPDATE TRANSACTION + SUMMARY UPDATE
   // ----------------------------------------------------------
-  async updateTransaction(id: number, dto: UpdateTransactionDto) {
+  async updateTransaction(
+    userId: number,
+    id: number,
+    dto: UpdateTransactionDto,
+  ) {
     return await this.dataSource.transaction(async (manager) => {
       const tx = await manager.findOne(Transaction, {
         where: { id },
@@ -379,6 +393,7 @@ export class TransactionService {
       });
 
       if (!tx) return { success: false, message: 'Transaction not found' };
+      await this.verifyAccountPermission(userId, tx.account.id);
 
       const oldTx = { ...tx };
       let ledgerNeeded = false;
@@ -486,7 +501,7 @@ export class TransactionService {
   // ----------------------------------------------------------
   // DELETE TRANSACTION + SUMMARY DELETE
   // ----------------------------------------------------------
-  async deleteTransaction(id: number) {
+  async deleteTransaction(userId: number, id: number) {
     return await this.dataSource.transaction(async (manager) => {
       const tx = await manager.findOne(Transaction, {
         where: { id },
@@ -494,6 +509,7 @@ export class TransactionService {
       });
 
       if (!tx) return { success: false, message: 'Transaction not found' };
+      await this.verifyAccountPermission(userId, tx.account.id);
 
       const oldAmount = tx.amount;
       const oldType = tx.type;

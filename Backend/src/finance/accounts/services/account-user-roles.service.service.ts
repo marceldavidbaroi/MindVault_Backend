@@ -251,7 +251,6 @@ export class AccountUserRolesService {
     if (!accountUserRole) {
       throw new BadRequestException('You have no role on this account');
     }
-
     const allowedRoleIds = [1, 2, 3];
     if (!allowedRoleIds.includes(accountUserRole.role.id)) {
       throw new BadRequestException(

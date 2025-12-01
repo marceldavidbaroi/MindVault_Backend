@@ -1,28 +1,18 @@
-// finance.module.ts
 import { Module } from '@nestjs/common';
-import { TransactionsModule } from './transactions/transactions.module';
-import { BudgetsModule } from './budgets/budgets.module';
-import { FinanceDashboardModule } from './finance-dashboard/finance-dashboard.module';
-import { ReportsModule } from './reports/reports.module';
-import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { CategoriesModule } from './categories/categories.module';
+import { CurrencyModule } from './currency/currency.module';
+import { AccountsModule } from './accounts/accounts.module';
+import { TransactionsModule } from './transactions/transactions.module';
 import { SummaryModule } from './summary/summary.module';
+import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 
 @Module({
   imports: [
-    TransactionsModule,
-    BudgetsModule,
-    FinanceDashboardModule,
-    ReportsModule,
-    SavingsGoalsModule,
     CategoriesModule,
-    SummaryModule,
-  ],
-  exports: [
+    CurrencyModule,
+    AccountsModule,
     TransactionsModule,
-    BudgetsModule,
-    FinanceDashboardModule,
-    ReportsModule,
+    SummaryModule,
     SavingsGoalsModule,
   ],
 })

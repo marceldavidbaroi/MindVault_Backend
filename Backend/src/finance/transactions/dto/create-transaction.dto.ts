@@ -1,53 +1,68 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsEnum,
   IsNotEmpty,
+  IsNumberString,
+  IsEnum,
   IsOptional,
-  IsString,
-  IsNumber,
   IsBoolean,
+  IsString,
   IsDateString,
 } from 'class-validator';
-import {
-  type RecurringInterval,
-  type TransactionType,
-} from '../transactions.entity';
-import { Type } from 'class-transformer';
 
 export class CreateTransactionDto {
-  @IsEnum(['income', 'expense'], {
-    message: 'Type must be either income or expense',
-  })
+  @ApiProperty({ description: 'Account id where transaction will be posted' })
   @IsNotEmpty()
-  type: TransactionType;
+  accountId: number;
 
-  @IsNumber({}, { message: 'Category must be a valid ID' })
-  @Type(() => Number) // <-- converts string to number automatically
-  @IsNotEmpty({ message: 'Category ID is required' })
-  categoryId: number;
-
-  @IsNumber({}, { message: 'Amount must be a number' })
-  @IsNotEmpty({ message: 'Amount is required' })
-  amount: number;
-
-  @IsDateString(
-    {},
-    { message: 'Date must be a valid ISO date string (YYYY-MM-DD)' },
-  )
-  @IsNotEmpty({ message: 'Date is required' })
-  date: string;
-
+  @ApiPropertyOptional({ description: 'Category id' })
   @IsOptional()
-  @IsString({ message: 'Description must be a string' })
+  categoryId?: number;
+
+  @ApiProperty({ enum: ['income', 'expense'] })
+  @IsEnum(['income', 'expense'])
+  type: 'income' | 'expense';
+
+  @ApiProperty({ description: 'Amount in decimal string (precision 18,2)' })
+  @IsNotEmpty()
+  @IsNumberString()
+  amount: string;
+
+  @ApiPropertyOptional({ description: 'Currency code id (FK)' })
+  @IsOptional()
+  currencyCode?: string;
+
+  @ApiProperty({ description: 'Date of transaction (YYYY-MM-DD)' })
+  @IsDateString()
+  transactionDate: string;
+
+  @ApiPropertyOptional({ description: 'Description or notes' })
+  @IsOptional()
+  @IsString()
   description?: string;
 
+  @ApiPropertyOptional({
+    enum: ['pending', 'cleared', 'void', 'failed'],
+    default: 'pending',
+  })
   @IsOptional()
-  @IsBoolean({ message: 'Recurring must be a boolean (true/false)' })
+  @IsEnum(['pending', 'cleared', 'void', 'failed'])
+  status?: 'pending' | 'cleared' | 'void' | 'failed';
+
+  @ApiPropertyOptional({ description: 'External reference id' })
+  @IsOptional()
+  @IsString()
+  externalRefId?: string;
+
+  @ApiPropertyOptional({ description: 'Is recurring?' })
+  @IsOptional()
+  @IsBoolean()
   recurring?: boolean;
 
-  @IsOptional()
-  @IsEnum(['daily', 'weekly', 'monthly', 'yearly'], {
-    message:
-      'Recurring interval must be one of: daily, weekly, monthly, yearly',
+  @ApiPropertyOptional({
+    description: 'Recurring interval',
+    enum: ['daily', 'weekly', 'monthly', 'yearly'],
   })
-  recurringInterval?: RecurringInterval;
+  @IsOptional()
+  @IsEnum(['daily', 'weekly', 'monthly', 'yearly'])
+  recurringInterval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
 }

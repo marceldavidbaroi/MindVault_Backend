@@ -1,19 +1,43 @@
-import { forwardRef, Module } from '@nestjs/common';
-import { TransactionsService } from './transactions.service';
-import { TransactionsController } from './transactions.controller';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Transactions } from './transactions.entity';
-import { BudgetsModule } from 'src/finance/budgets/budgets.module';
+import { Transaction } from './entities/transaction.entity';
+import { RecurringTransactionSchedule } from './entities/recurring-transaction-schedule.entity';
+import { TransactionService } from './services/transaction.service';
+import { RecurringTransactionService } from './services/recurring-transaction.service';
+import { TransactionsController } from './controllers/transactions.controller';
+
+// Import other modules (accounts, users, categories, currency) - adjust paths as needed
+import { AccountsModule } from 'src/finance/accounts/accounts.module';
+import { CurrencyModule } from 'src/finance/currency/currency.module';
+import { CategoriesModule } from 'src/finance/categories/categories.module';
+import { AuthModule } from 'src/auth/auth.module';
 import { SummaryModule } from '../summary/summary.module';
+import { AccountLedger } from './entities/ledger.entity';
+import { LedgerService } from './services/ledger.service';
+import { Account } from '../accounts/entity/account.entity';
+import { MonthlySummary } from '../summary/entity/monthly-summary.entity';
+import { YearlySummary } from '../summary/entity/yearly-summary.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Transactions]),
-    forwardRef(() => BudgetsModule),
-    forwardRef(() => SummaryModule),
+    TypeOrmModule.forFeature([
+      Transaction,
+      RecurringTransactionSchedule,
+      AccountLedger,
+      Account,
+      MonthlySummary,
+      YearlySummary,
+    ]),
+    // account module is used for accountService
+    AccountsModule,
+    CurrencyModule,
+    CategoriesModule,
+    SummaryModule,
+
+    AuthModule,
   ],
-  providers: [TransactionsService],
   controllers: [TransactionsController],
-  exports: [TransactionsService],
+  providers: [TransactionService, RecurringTransactionService, LedgerService],
+  exports: [TransactionService, RecurringTransactionService],
 })
 export class TransactionsModule {}

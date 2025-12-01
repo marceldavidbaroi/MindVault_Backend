@@ -2,172 +2,121 @@ import {
   Controller,
   Get,
   Post,
-  Body,
-  Param,
-  Patch,
+  Put,
   Delete,
+  Param,
+  Body,
   Query,
   UseGuards,
   ParseIntPipe,
-  BadRequestException,
+  Patch,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { FilterCategoriesDto } from './dto/filter-category.dto';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/user.entity';
-import { Category } from './categories.entity';
+import { User } from 'src/auth/entities/user.entity';
+import { AuthGuard } from '@nestjs/passport';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse as SwaggerResponse,
+} from '@nestjs/swagger';
 import { ApiResponse } from 'src/common/types/api-response.type';
+import { Category, CategoryStats } from './categories.entity';
+import { FilterCategoryDto } from './dto/filter-category.dto';
 
-@Controller('categories')
+@ApiTags('Finance Categories')
 @UseGuards(AuthGuard('jwt'))
+@Controller('finance/categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
-  /** CREATE */
   @Post()
+  @ApiOperation({ summary: 'Create a new category' })
+  @SwaggerResponse({
+    status: 201,
+    description: 'Category created successfully.',
+  })
   async create(
-    @Body() createCategoryDto: CreateCategoryDto,
     @GetUser() user: User,
+    @Body() dto: CreateCategoryDto,
   ): Promise<ApiResponse<Category>> {
-    try {
-      const category = await this.categoriesService.create(
-        createCategoryDto,
-        user,
-      );
-      return {
-        success: true,
-        message: 'Category created successfully',
-        data: category,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message:
-          error.code === '23505'
-            ? `Category with name "${createCategoryDto.name}" already exists.`
-            : error.message || 'Failed to create category',
-        data: null,
-      };
-    }
+    const category = await this.categoriesService.createCategory(user, dto);
+    return { success: true, message: 'Category created', data: category };
   }
 
-  /** FIND ALL */
-  @Get()
-  async findAll(
-    @Query() filterDto: FilterCategoriesDto,
-    @GetUser() user: User,
-  ): Promise<ApiResponse<Category[]>> {
-    try {
-      const categories = await this.categoriesService.findAll(
-        filterDto,
-        user?.id,
-      );
-      return {
-        success: true,
-        message: 'Categories fetched successfully',
-        data: categories,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: error.message || 'Failed to fetch categories',
-        data: null,
-      };
-    }
-  }
-
-  /** FIND ONE */
-  @Get(':id')
-  async findOne(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<ApiResponse<Category>> {
-    try {
-      const category = await this.categoriesService.findOne(id);
-      return {
-        success: true,
-        message: 'Category fetched successfully',
-        data: category,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: error.message || 'Failed to fetch category',
-        data: null,
-      };
-    }
-  }
-
-  /** UPDATE */
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a category' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Category updated successfully.',
+  })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateCategoryDto: UpdateCategoryDto,
     @GetUser() user: User,
+    @Body() dto: UpdateCategoryDto,
   ): Promise<ApiResponse<Category>> {
-    try {
-      const category = await this.categoriesService.update(
-        id,
-        updateCategoryDto,
-        user.id,
-      );
-      return {
-        success: true,
-        message: 'Category updated successfully',
-        data: category,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message:
-          error.code === '23505'
-            ? `Category with name "${updateCategoryDto.name}" already exists.`
-            : error.message || 'Failed to update category',
-        data: null,
-      };
-    }
+    const category = await this.categoriesService.updateCategory(id, dto, user);
+    return { success: true, message: 'Category updated', data: category };
   }
 
-  /** DELETE */
   @Delete(':id')
-  async remove(
+  @ApiOperation({ summary: 'Delete a category' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Category deleted successfully.',
+  })
+  async delete(
     @Param('id', ParseIntPipe) id: number,
     @GetUser() user: User,
   ): Promise<ApiResponse<null>> {
-    try {
-      await this.categoriesService.remove(id, user.id);
-      return {
-        success: true,
-        message: 'Category deleted successfully',
-        data: null,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: error.message || 'Failed to delete category',
-        data: null,
-      };
-    }
+    await this.categoriesService.deleteCategory(id, user);
+    return { success: true, message: 'Category deleted', data: null };
   }
 
-  /** STATS */
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a single category' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Category fetched successfully.',
+  })
+  async get(
+    @Param('id', ParseIntPipe) id: number,
+    @GetUser() user: User,
+  ): Promise<ApiResponse<Category>> {
+    const category = await this.categoriesService.getCategory(id, user);
+    return { success: true, message: 'Category fetched', data: category };
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List categories' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Categories fetched successfully.',
+  })
+  async list(
+    @GetUser() user: User,
+    @Query() filters: FilterCategoryDto,
+  ): Promise<ApiResponse<Category[]>> {
+    const { type, search, scope } = filters;
+    const categories = await this.categoriesService.listCategories(
+      user,
+      type,
+      search,
+      scope,
+    );
+    return { success: true, message: 'Categories fetched', data: categories };
+  }
+
   @Get('stats/all')
-  async getStats(@GetUser() user: User): Promise<ApiResponse<any>> {
-    try {
-      const stats = await this.categoriesService.getStats(user?.id);
-      return {
-        success: true,
-        message: 'Category stats fetched successfully',
-        data: stats,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: error.message || 'Failed to fetch stats',
-        data: null,
-      };
-    }
+  @ApiOperation({ summary: 'Get categories statistics/status' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Category statistics fetched successfully.',
+  })
+  async status(@GetUser() user: User): Promise<ApiResponse<CategoryStats>> {
+    const stats = await this.categoriesService.getCategoryStats(user);
+    return { success: true, message: 'Category stats fetched', data: stats };
   }
 }

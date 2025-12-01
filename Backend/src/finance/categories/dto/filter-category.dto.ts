@@ -1,15 +1,26 @@
-import { IsOptional, IsEnum } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { CategoryType, CategoryScope } from '../categories.entity';
 
-export class FilterCategoriesDto {
-  @IsOptional()
-  @IsEnum(['system', 'user'], {
-    message: "type must be either 'system' or 'user'",
+export class FilterCategoryDto {
+  @ApiPropertyOptional({
+    enum: CategoryType,
+    description: 'Filter by transaction type',
   })
-  ownership?: 'system' | 'user';
+  @IsOptional()
+  @IsEnum(CategoryType)
+  type?: CategoryType;
 
-  @IsOptional()
-  @IsEnum(['income', 'expense'], {
-    message: "categoryType must be either 'income' or 'expense'",
+  @ApiPropertyOptional({
+    enum: CategoryScope,
+    description: 'Filter by category scope',
   })
-  categoryType?: 'income' | 'expense';
+  @IsOptional()
+  @IsEnum(CategoryScope)
+  scope?: CategoryScope;
+
+  @ApiPropertyOptional({ description: 'Search by name or display name' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

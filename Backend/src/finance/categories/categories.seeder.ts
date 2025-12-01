@@ -1,78 +1,40 @@
-import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { Command } from 'nestjs-command';
 import { Category } from './categories.entity';
+import { defaultCategories } from './categories.data';
 
 @Injectable()
-export class CategorySeeder implements OnApplicationBootstrap {
+export class CategoriesSeeder {
   constructor(
+    private readonly dataSource: DataSource, // Use DataSource to run raw queries
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
   ) {}
 
-  async onApplicationBootstrap() {
-    const count = await this.categoryRepo.count();
+  @Command({
+    command: 'categories:run',
+    describe: 'Seed default categories',
+  })
+  async seed() {
+    try {
+      console.log('🧹 Truncating categories table...');
 
-    if (count === 0) {
-      const incomeCategories: {
-        name: string;
-        displayName: string;
-        type: 'income';
-      }[] = [
-        'salary',
-        'freelance',
-        'business',
-        'investment',
-        'rental_income',
-        'gift',
-        'refund',
-        'other_income',
-      ].map((name) => ({
-        name,
-        displayName: name
-          .replace(/_/g, ' ')
-          .replace(/\b\w/g, (l) => l.toUpperCase()),
-        type: 'income',
-      }));
-
-      const expenseCategories: {
-        name: string;
-        displayName: string;
-        type: 'expense';
-      }[] = [
-        'food_groceries',
-        'food_dining',
-        'housing_rent',
-        'housing_mortgage',
-        'utilities',
-        'transportation',
-        'health_medical',
-        'education',
-        'entertainment',
-        'shopping',
-        'travel',
-        'personal_care',
-        'insurance',
-        'debt_repayment',
-        'savings_investments',
-        'charity_donation',
-        'other_expense',
-      ].map((name) => ({
-        name,
-        displayName: name
-          .replace(/_/g, ' ')
-          .replace(/\b\w/g, (l) => l.toUpperCase()),
-        type: 'expense',
-      }));
-
-      await this.categoryRepo.save(
-        [...incomeCategories, ...expenseCategories].map((c) => ({
-          ...c,
-          user: null,
-        })),
+      // Truncate table and restart identity (auto-increment)
+      await this.dataSource.query(
+        `TRUNCATE TABLE categories RESTART IDENTITY CASCADE;`,
       );
 
-      console.log('Categories table seeded successfully.');
+      console.log('📥 Seeding default categories...');
+      for (const c of defaultCategories) {
+        const category = this.categoryRepo.create(c);
+        await this.categoryRepo.save(category);
+      }
+
+      console.log('✅ Categories seeded successfully!');
+    } catch (err) {
+      console.error('❌ Failed to seed categories:', err);
     }
   }
 }

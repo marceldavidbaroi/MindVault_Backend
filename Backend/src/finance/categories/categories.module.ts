@@ -1,13 +1,16 @@
+// categories.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Category } from './categories.entity';
-import { CategorySeeder } from './categories.seeder';
-import { CategoriesController } from './categories.controller';
 import { CategoriesService } from './categories.service';
+import { CategoriesController } from './categories.controller';
+import { Category } from './categories.entity';
+import { CategoriesSeeder } from './categories.seeder';
+import { CommandModule } from 'nestjs-command';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Category])],
-  providers: [CategorySeeder, CategoriesService],
+  imports: [TypeOrmModule.forFeature([Category]), CommandModule],
   controllers: [CategoriesController],
+  providers: [CategoriesSeeder, CategoriesService],
+  exports: [CategoriesService],
 })
 export class CategoriesModule {}

@@ -1,19 +1,36 @@
-Below is the compact, clean, standardized **README Module Development Guide** with the added
-**✅ Auto-Documentation Template for Swagger**.
+Great — I’ll update and enhance this **Module Development Guide** to match your expanded architecture:
+
+- Repository Layer
+- Validators Layer
+- Transformers Layer
+- (Optional) Event Hooks
+- AI-friendly patterns
+- Contact/Finance module scalability
+- Full modernization + clarity
+
+Here is the **updated, polished, extended version**:
 
 ---
 
-# 📘 Module Development Guide
+# 📘 **MindVault — Module Development Guide (Updated & AI-Optimized)**
 
-**For AI Agents & Developers (NestJS + TypeORM + JWT Auth)**
+**For AI Agents & Developers (NestJS + TypeORM + RBAC + JWT)**
 
-This document defines the **official structure, patterns, and return types** required to build backend modules consistently.
+This guide defines the **standard architecture**, **patterns**, and **return rules** for building modules in MindVault.
+It ensures every module is:
+
+- Predictable
+- Scalable
+- Extensible
+- AI-friendly
+- Event-module compatible
+- Swagger-documented
 
 ---
 
-# 📂 1. Module Folder Structure
+# 📂 **1. Module Folder Structure — Official Standard**
 
-Each module must follow this structure:
+Each module **must** follow this expanded structure:
 
 ```
 /src/<module-name>/
@@ -21,62 +38,143 @@ Each module must follow this structure:
 │     └── <module>.controller.ts
 │── services/
 │     ├── <module>.service.ts
-│     └── other-feature.service.ts
+│     └── <feature>.service.ts
+│── repository/
+│     └── <module>.repository.ts
+│── transformers/
+│     └── <module>.transformer.ts
+│── validators/
+│     └── <module>.validator.ts
 │── entity/
 │     └── <entity>.entity.ts
 │── dto/
 │     ├── create-*.dto.ts
 │     ├── update-*.dto.ts
-│     └── other.dto.ts
+│     ├── query-*.dto.ts
+│     └── shared.dto.ts
 │── <module>.module.ts
 ```
 
+### **Why this structure?**
+
+- Clean separation of **Data → Logic → Validation → Output**
+- Perfect for AI agents to modify safely
+- Supports future Event Module hooks
+- Reduces code duplication
+- Improves readability & testability
+
 ---
 
-# 🧱 2. Entity Requirements
+# 🧱 **2. Entity Rules (Mandatory)**
 
-### ✅ Naming rules
+### ✔ Table names must be **snake_case**
 
-- Table names **must be snake_case**
-- Entity class name is **PascalCase**
-- Column names are automatically camelCase unless overridden
+### ✔ Entity classes use **PascalCase**
+
+### ✔ Use `uuid` for primary keys
+
+### ✔ Use TypeORM decorators consistently
+
+### ✔ Use `jsonb` for flexible metadata
 
 ### Example:
 
 ```ts
-@Entity("account_types") // snake_case table
-export class AccountType {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity("people")
+export class Person {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
-  @Column({ type: "varchar", length: 50 })
-  name: string;
+  @Column({ type: "uuid" })
+  userId: string;
 }
 ```
 
 ---
 
-# 🛠 3. Service Structure (Mandatory Pattern)
+# 🛢 **3. Repository Layer (Data Access)**
 
-All services must:
+Every module must use a **custom repository**.
 
-### ✔ Accept `User` from controller (auth context)
+### **Responsibilities**
 
-### ✔ Use dependency injection
+- DB CRUD
+- Query builder logic
+- Filters & search
+- Pagination
+- Soft delete
+- Relationship queries
+- Performance optimizations
 
-### ✔ Handle access control inside service
-
-### ✔ Throw NestJS exceptions (not manual messages)
-
-### ❗ MUST return normalized ApiResponse format
+### **Service should NOT contain SQL or QueryBuilder logic.**
 
 ---
 
-# 🔄 4. **Return Type Rules (VERY IMPORTANT)**
+# 🧠 **4. Validator Layer (Input Validation + Business Rules)**
 
-### ✔ Controllers should NOT format responses
+Validators handle:
 
-### ✔ Services MUST return this structure:
+### DTO-level validation
+
+- email format
+- phone format
+- string length
+- enums
+- date validation
+
+### Module-specific business validation
+
+- uniqueness checks
+- future/past date rules
+- cross-field validation
+- logical constraints
+- metadata schema rules
+
+### ❗ NEVER put validation inside controller or service.
+
+---
+
+# 🎨 **5. Transformer Layer (Output Formatting)**
+
+Transformers convert **entities → API-friendly DTO responses**.
+
+### Responsibilities:
+
+- Format dates
+- Hide internal fields
+- Compute derived fields
+- Rename fields
+- Combine values (e.g., fullName)
+- Attach related entities
+- Prepare consistent output structure
+
+### Controllers must NEVER manually format responses.
+
+---
+
+# 🛠 **6. Service Layer (Business Logic Only)**
+
+### Service rules:
+
+- Always accept `user: User` from controller
+- Perform permission checks
+- Call repository methods
+- Use validators if needed
+- Use transformers for output
+- Return normalized ApiResponse
+
+### ❗ Never:
+
+- Touch HTTP logic
+- Format responses
+- Access database directly
+- Hard-code role checks
+
+---
+
+# 🔄 **7. Return Type Rules (Standardized APIResponse)**
+
+Every service returns:
 
 ```ts
 export interface ApiResponse<T> {
@@ -86,40 +184,30 @@ export interface ApiResponse<T> {
 }
 ```
 
-### Example inside service:
-
-```ts
-return {
-  success: true,
-  message: "Account updated",
-  data: updatedAccount,
-};
-```
+### Controller returns the service result **AS-IS**.
 
 ---
 
-# 👤 5. Getting Current User
+# 👤 **8. Getting the Current User**
 
-Use the decorator:
+Always use:
 
 ```ts
 @GetUser() user: User
 ```
 
-It injects the authenticated user's data from JWT.
-
 ---
 
-# 🧩 6. Controller Structure
+# 🧩 **9. Controller Structure (Clean & Thin)**
 
-Controllers must:
+Controllers:
 
-- Use Swagger decorators
-- Use `@UseGuards(AuthGuard('jwt'))`
-- Use `GetUser()` to access authenticated user
-- Return `ApiResponse<T>` exactly
+- MUST use Swagger decorators
+- MUST use JWT guard
+- MUST delegate everything to services
+- MUST return `ApiResponse<T>` as received
 
-### Example:
+Example:
 
 ```ts
 @Post()
@@ -131,93 +219,37 @@ async create(
 }
 ```
 
-**No formatting, no modifications.**
-
 ---
 
-# 🧠 7. Service → Controller Data Flow
+# 📘 **10. DTO Standards**
 
-```
-Controller → passes (user, dto, params)
-Service → performs logic
-Service → returns ApiResponse
-Controller → returns ApiResponse AS-IS to client
-```
-
----
-
-# 🔐 8. Access Control Pattern
-
-- **NEVER check permissions in controllers**
-- Always check inside services
-
-Example:
-
-```ts
-const userRole = await this.roleService.findOne(entityId, user.id);
-
-if (!["owner", "admin"].includes(userRole.role.name)) {
-  throw new ForbiddenException("Not allowed");
-}
-```
-
----
-
-# 🏗 9. Standard CRUD Pattern (Template)
-
-### Service
-
-```ts
-async create(user: User, dto: CreateDto): Promise<ApiResponse<Entity>> {
-  const entity = this.repo.create(dto);
-  const saved = await this.repo.save(entity);
-
-  return {
-    success: true,
-    message: '<Entity> created',
-    data: saved,
-  };
-}
-```
-
-### Controller
-
-```ts
-@Post()
-async create(
-  @GetUser() user: User,
-  @Body() dto: CreateDto,
-): Promise<ApiResponse<Entity>> {
-  return this.service.create(user, dto);
-}
-```
-
----
-
-# 📘 10. DTO Naming Standards
+Naming:
 
 ```
 CreateXDto
 UpdateXDto
-AssignXDto
 QueryXDto
+FilterXDto
 ```
 
-All DTOs must use class-validator & class-transformer.
+All DTOs must use:
+
+- class-validator
+- class-transformer
 
 ---
 
-# 📌 11. Auto-Swagger Documentation Template (Copy/Paste)
+# 🎯 **11. Swagger Documentation Template (Auto-Docs)**
 
-### Add at top of controller:
+At the top:
 
 ```ts
-@ApiTags('<Module Name>')
+@ApiTags('<Module>')
 @UseGuards(AuthGuard('jwt'))
-@Controller('<route-prefix>')
+@Controller('<route>')
 ```
 
-### For each endpoint:
+Each method:
 
 ```ts
 @ApiOperation({ summary: '<Short description>' })
@@ -227,15 +259,15 @@ All DTOs must use class-validator & class-transformer.
 @ApiResponse({ status: 404, description: 'Not found' })
 ```
 
-### Example template:
+Full example:
 
 ```ts
 @Get(':id')
 @ApiOperation({ summary: 'Get <Entity> by ID' })
-@ApiResponse({ status: 200, description: '<Entity> fetched successfully.' })
-@ApiResponse({ status: 404, description: '<Entity> not found.' })
+@ApiResponse({ status: 200, description: '<Entity> fetched.' })
+@ApiResponse({ status: 404, description: 'Not found.' })
 async getOne(
-  @Param('id', ParseIntPipe) id: number,
+  @Param('id') id: string,
   @GetUser() user: User,
 ): Promise<ApiResponse<Entity>> {
   return this.service.getOne(id, user);
@@ -244,35 +276,82 @@ async getOne(
 
 ---
 
-# 🤖 12. Rules for AI Agents (Module Generator)
+# 🔐 **12. Access Control Pattern (Mandatory)**
 
-When generating a new module:
+**Permissions must ONLY be checked inside services**.
 
-### ✔ Must create:
+Example:
 
-- entity (snake_case table)
-- dtos
-- service
-- controller
-- module file
+```ts
+const role = await this.roleService.findUserRole(entityId, user.id);
 
-### ✔ Must use:
+if (!["owner", "admin"].includes(role.name)) {
+  throw new ForbiddenException("Not allowed");
+}
+```
 
-- `ApiResponse<T>` return format
-- `@GetUser() user: User`
-- Swagger decorators
-- NestJS guards
-- TypeORM repository injection
+---
 
-### ✔ Must avoid:
+# 🧩 **13. Event Module Compatibility (Future-Proofing)**
 
-- Business logic inside controller
-- Returning raw TypeORM entities directly
-- Missing auth or role validation
+All modules should be prepared to interact with the Event Module.
+
+### Services may:
+
+- emit event creation requests
+- schedule reminders
+- send event payloads
+- subscribe to centralized handlers
+
+This improves maintainability and automation.
+
+---
+
+# 🤖 **14. AI Agent Rules (Autonomous Generation)**
+
+When an AI agent generates a module, it MUST:
+
+### Create:
+
+✔ entity
+✔ DTOs
+✔ repository
+✔ validators
+✔ transformers
+✔ service
+✔ controller
+✔ module
+
+### Follow:
+
+✔ Return ApiResponse
+✔ Use Swagger
+✔ Use `@GetUser()`
+✔ Use guards
+✔ Use repository for DB
+✔ Use transformers for output
+✔ Use validators for input
+
+### Avoid:
+
+❌ business logic in controllers
+❌ db logic in services
+❌ direct entity returns
+❌ modifying output shape in controller
 
 ---
 
 # 🏁 Final Notes
 
-Follow this document strictly.
-All modules must remain **predictable**, **typed**, **authenticated**, and **fully Swagger-documented**.
+This guide ensures that every module is:
+
+- scalable
+- consistent
+- predictable
+- future-proof
+- event-ready
+- safe for AI agents
+- well-documented
+- maintainable long term
+
+---

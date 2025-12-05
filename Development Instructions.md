@@ -1,6 +1,4 @@
----
-
-# 📘 **MindVault — Module Development Guide (Updated & AI-Optimized)**
+# 📘 **MindVault — Module Development Guide **
 
 **For AI Agents & Developers (NestJS + TypeORM + RBAC + JWT)**
 
@@ -43,14 +41,6 @@ Each module **must** follow this expanded structure:
 │── <module>.module.ts
 ```
 
-### **Why this structure?**
-
-- Clean separation of **Data → Logic → Validation → Output**
-- Perfect for AI agents to modify safely
-- Supports future Event Module hooks
-- Reduces code duplication
-- Improves readability & testability
-
 ---
 
 # 🧱 **2. Entity Rules (Mandatory)**
@@ -59,22 +49,54 @@ Each module **must** follow this expanded structure:
 
 ### ✔ Entity classes use **PascalCase**
 
-### ✔ Use `uuid` for primary keys
-
-### ✔ Use TypeORM decorators consistently
-
-### ✔ Use `jsonb` for flexible metadata
-
-### Example:
+### ✔ Use **numeric auto-increment PKs**
 
 ```ts
-@Entity("people")
-export class Person {
-  @PrimaryGeneratedColumn("uuid")
-  id: string;
+@PrimaryGeneratedColumn()
+id: number;
+```
 
-  @Column({ type: "uuid" })
-  userId: string;
+### ✔ Column names must be **snake_case**, entity fields **camelCase**
+
+```ts
+@Column({ type: 'varchar', length: 150, name: 'display_name' })
+displayName: string;
+```
+
+### ✔ Use `jsonb` for flexible metadata if needed
+
+---
+
+### Example Entity Pattern
+
+```ts
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from "typeorm";
+
+@Entity({ name: "people" })
+export class Person {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ type: "varchar", length: 100, name: "first_name" })
+  firstName: string;
+
+  @Column({ type: "varchar", length: 100, name: "last_name" })
+  lastName: string;
+
+  @Column({ type: "varchar", length: 150, nullable: true, name: "email" })
+  email?: string;
+
+  @CreateDateColumn({ type: "timestamp", name: "created_at" })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: "timestamp", name: "updated_at" })
+  updatedAt: Date;
 }
 ```
 
@@ -82,9 +104,7 @@ export class Person {
 
 # 🛢 **3. Repository Layer (Data Access)**
 
-Every module must use a **custom repository**.
-
-### **Responsibilities**
+Responsibilities:
 
 - DB CRUD
 - Query builder logic
@@ -94,7 +114,7 @@ Every module must use a **custom repository**.
 - Relationship queries
 - Performance optimizations
 
-### **Service should NOT contain SQL or QueryBuilder logic.**
+> Services **must not** contain SQL or QueryBuilder logic.
 
 ---
 
@@ -102,67 +122,44 @@ Every module must use a **custom repository**.
 
 Validators handle:
 
-### DTO-level validation
+- DTO-level validation (length, enums, dates, formats)
+- Module-specific business validation (uniqueness, cross-field logic)
 
-- email format
-- phone format
-- string length
-- enums
-- date validation
-
-### Module-specific business validation
-
-- uniqueness checks
-- future/past date rules
-- cross-field validation
-- logical constraints
-- metadata schema rules
-
-### ❗ NEVER put validation inside controller or service.
+> ❗ Never put validation inside controllers or services.
 
 ---
 
 # 🎨 **5. Transformer Layer (Output Formatting)**
 
-Transformers convert **entities → API-friendly DTO responses**.
-
-### Responsibilities:
+Transformers convert **entities → API-friendly DTOs**:
 
 - Format dates
 - Hide internal fields
 - Compute derived fields
 - Rename fields
-- Combine values (e.g., fullName)
+- Combine values
 - Attach related entities
-- Prepare consistent output structure
 
-### Controllers must NEVER manually format responses.
+> Controllers must never format responses manually.
 
 ---
 
 # 🛠 **6. Service Layer (Business Logic Only)**
 
-### Service rules:
+Rules:
 
-- Always accept `user: User` from controller
+- Accept `user: User` from controller
 - Perform permission checks
 - Call repository methods
-- Use validators if needed
-- Use transformers for output
-- Return normalized ApiResponse
+- Use validators
+- Use transformers
+- Return normalized `ApiResponse<T>`
 
-### ❗ Never:
-
-- Touch HTTP logic
-- Format responses
-- Access database directly
-- Hard-code role checks
+> ❗ Never touch HTTP logic, format responses, access DB directly, or hard-code role checks.
 
 ---
 
 # 🔄 **7. Return Type Rules (Standardized APIResponse)**
-
-Every service returns:
 
 ```ts
 export interface ApiResponse<T> {
@@ -172,13 +169,11 @@ export interface ApiResponse<T> {
 }
 ```
 
-### Controller returns the service result **AS-IS**.
+Controllers return **as-is**.
 
 ---
 
 # 👤 **8. Getting the Current User**
-
-Always use:
 
 ```ts
 @GetUser() user: User
@@ -190,10 +185,10 @@ Always use:
 
 Controllers:
 
-- MUST use Swagger decorators
-- MUST use JWT guard
-- MUST delegate everything to services
-- MUST return `ApiResponse<T>` as received
+- Use Swagger decorators
+- Use JWT guard
+- Delegate to services
+- Return `ApiResponse<T>`
 
 Example:
 
@@ -220,16 +215,12 @@ QueryXDto
 FilterXDto
 ```
 
-All DTOs must use:
-
-- class-validator
-- class-transformer
+- Use `class-validator`
+- Use `class-transformer`
 
 ---
 
 # 🎯 **11. Swagger Documentation Template (Auto-Docs)**
-
-At the top:
 
 ```ts
 @ApiTags('<Module>')
@@ -237,17 +228,7 @@ At the top:
 @Controller('<route>')
 ```
 
-Each method:
-
-```ts
-@ApiOperation({ summary: '<Short description>' })
-@ApiResponse({ status: 200, description: '<Success message>' })
-@ApiResponse({ status: 400, description: 'Validation error' })
-@ApiResponse({ status: 403, description: 'Forbidden' })
-@ApiResponse({ status: 404, description: 'Not found' })
-```
-
-Full example:
+Method example:
 
 ```ts
 @Get(':id')
@@ -255,7 +236,7 @@ Full example:
 @ApiResponse({ status: 200, description: '<Entity> fetched.' })
 @ApiResponse({ status: 404, description: 'Not found.' })
 async getOne(
-  @Param('id') id: string,
+  @Param('id') id: number,
   @GetUser() user: User,
 ): Promise<ApiResponse<Entity>> {
   return this.service.getOne(id, user);
@@ -264,82 +245,74 @@ async getOne(
 
 ---
 
-# 🔐 **12. Access Control Pattern (Mandatory)**
+# 🔐 **12. Access Control Pattern**
 
-**Permissions must ONLY be checked inside services**.
-
-Example:
+Permissions checked **inside services only**:
 
 ```ts
-const role = await this.roleService.findUserRole(entityId, user.id);
-
-if (!["owner", "admin"].includes(role.name)) {
-  throw new ForbiddenException("Not allowed");
+if (entity.userId !== user.id || entity.isSystem) {
+  throw new ForbiddenException("Not allowed.");
 }
 ```
 
----
-
-# 🧩 **13. Event Module Compatibility (Future-Proofing)**
-
-All modules should be prepared to interact with the Event Module.
-
-### Services may:
-
-- emit event creation requests
-- schedule reminders
-- send event payloads
-- subscribe to centralized handlers
-
-This improves maintainability and automation.
+> System-defined records can only be modified by developers.
 
 ---
 
-# 🤖 **14. AI Agent Rules (Autonomous Generation)**
+# 🧩 **13. Event Module Compatibility**
 
-When an AI agent generates a module, it MUST:
+Services may:
 
-### Create:
+- Emit event creation requests
+- Schedule reminders
+- Send payloads
+- Subscribe to centralized handlers
 
-✔ entity
-✔ DTOs
-✔ repository
-✔ validators
-✔ transformers
-✔ service
-✔ controller
-✔ module
+---
 
-### Follow:
+# 🤖 **14. AI Agent Rules**
 
-✔ Return ApiResponse
-✔ Use Swagger
-✔ Use `@GetUser()`
-✔ Use guards
-✔ Use repository for DB
-✔ Use transformers for output
-✔ Use validators for input
+Modules must generate:
 
-### Avoid:
+- Entity
+- DTOs
+- Repository
+- Validators
+- Transformers
+- Service
+- Controller
+- Module
 
-❌ business logic in controllers
-❌ db logic in services
-❌ direct entity returns
-❌ modifying output shape in controller
+Rules:
+
+- Return `ApiResponse`
+- Use Swagger
+- Use `@GetUser()`
+- Use guards
+- Use repository for DB
+- Use transformers for output
+- Use validators for input
+
+Avoid:
+
+- Business logic in controllers
+- DB logic in services
+- Direct entity returns
+- Modifying output shape in controller
 
 ---
 
 # 🏁 Final Notes
 
-This guide ensures that every module is:
+Ensures modules are:
 
-- scalable
-- consistent
-- predictable
-- future-proof
-- event-ready
-- safe for AI agents
-- well-documented
-- maintainable long term
+- Scalable
+- Consistent
+- Predictable
+- Future-proof
+- Event-ready
+- Safe for AI agents
+- Well-documented
+- Maintainable
 
 ---

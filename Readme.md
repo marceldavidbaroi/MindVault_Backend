@@ -74,6 +74,9 @@ npm run seed:roles
 npm run seed:categories
 npm run seed:currencies
 npm run seed:account-types
+npm run seed:tag-groups
+npm run seed:tags
+
 ```
 
 4. **Start the development server:**

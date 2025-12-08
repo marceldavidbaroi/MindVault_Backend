@@ -25,7 +25,9 @@
     "seed:categories": "ts-node -r tsconfig-paths/register src/main.ts categories:run",
     "seed:roles": "ts-node -r tsconfig-paths/register src/main.ts roles:run",
     "seed:currency": "ts-node -r tsconfig-paths/register src/main.ts currency:seed",
-    "seed:account-types": "ts-node -r tsconfig-paths/register src/main.ts account-type:seed"
+    "seed:account-types": "ts-node -r tsconfig-paths/register src/main.ts account-type:seed",
+    "seed:tag-groups": "ts-node -r tsconfig-paths/register src/main.ts tag-group:seed",
+    "seed:tags": "ts-node -r tsconfig-paths/register src/main.ts tag:seed"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

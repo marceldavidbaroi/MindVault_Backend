@@ -106,8 +106,9 @@ export class TagGroupsRepository {
   async saveMany(groups: Partial<TagGroup>[]) {
     return this.repo.save(groups);
   }
-
   async truncate() {
-    await this.repo.query('TRUNCATE TABLE tag_groups CASCADE;');
+    await this.repo.query(
+      'TRUNCATE TABLE tag_groups RESTART IDENTITY CASCADE;',
+    );
   }
 }

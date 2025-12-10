@@ -59,4 +59,13 @@ export class QueryTagDto {
   @IsInt()
   @Min(1)
   page?: number;
+
+  @ApiPropertyOptional({
+    description: 'Include the group relation in the results',
+    example: true,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeGroup?: boolean;
 }

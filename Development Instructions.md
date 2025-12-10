@@ -325,6 +325,56 @@ export const defaultData: Partial<<EntityName>>[] = [
 ];
 ```
 
+# 🧱 **Entity Relations **
+
+1. **Store IDs separately**
+   Always keep the foreign key in a column, even with a relation:
+
+   ```ts
+   @ManyToOne(() => TagGroup)
+   @JoinColumn({ name: 'group_id' })
+   group?: TagGroup;
+
+   @Column({ type: 'int', nullable: true, name: 'group_id' })
+   groupId?: number;
+   ```
+
+2. **Dynamic relation loading**
+   Fetch relations only when requested, using query flags:
+
+   ```ts
+   relations.forEach((r) => qb.leftJoinAndSelect(`tag.${r}`, r));
+   ```
+
+3. **Always load relations for single entities**
+
+   ```ts
+   await this.repo.findOne({ where: { id }, relations: ["group"] });
+   ```
+
+4. **Query DTO flags**
+   Let the client control relations:
+
+   ```ts
+   @IsOptional() @IsBoolean() includeGroup?: boolean;
+   ```
+
+5. **Transformers for output**
+
+   - Use IDs in lists
+   - Include relational data in detailed responses
+
+   ```ts
+   groupId: tag.groupId,
+   groupName: tag.group?.displayName
+   ```
+
+**✅ Principle:**
+
+- Lists → IDs only (lightweight)
+- Single entity → load full relation
+- Keep control via query parameters
+
 > ✅ **Key points:**
 >
 > - Data files are **pure data**, no logic

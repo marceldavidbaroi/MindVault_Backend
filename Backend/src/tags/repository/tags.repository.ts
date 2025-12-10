@@ -11,31 +11,46 @@ export class TagsRepository {
     this.repo = this.dataSource.getRepository(Tag);
   }
 
-  async findAll(query: QueryTagDto, userId: number): Promise<Tag[]> {
+  async findAll(
+    query: QueryTagDto,
+    userId: number,
+    relations: string[] = [], // dynamic relations
+  ): Promise<Tag[]> {
     const qb = this.repo.createQueryBuilder('tag');
 
+    // Search query
     if (query.q) {
       qb.andWhere('(tag.displayName ILIKE :q OR tag.name ILIKE :q)', {
         q: `%${query.q}%`,
       });
     }
 
+    // Filter by group
     if (query.groupId) {
       qb.andWhere('tag.groupId = :groupId', { groupId: query.groupId });
     }
 
+    // Exclude system tags if not requested
     if (!query.includeSystem) {
       qb.andWhere('tag.isSystem = false');
     }
 
+    // Exclude deleted tags if not requested
     if (!query.includeDeleted) {
       qb.andWhere('tag.isDeleted = false');
     }
 
+    // User-specific tags or system tags
     qb.andWhere('(tag.userId = :userId OR tag.isSystem = true)', { userId });
 
+    // Pagination
     if (query.limit) qb.take(query.limit);
     if (query.page) qb.skip((query.page - 1) * (query.limit || 0));
+
+    // Dynamically join relations
+    relations.forEach((relation) => {
+      qb.leftJoinAndSelect(`tag.${relation}`, relation);
+    });
 
     return qb.getMany();
   }
@@ -46,7 +61,9 @@ export class TagsRepository {
         { id, userId },
         { id, isSystem: true },
       ],
+      relations: ['group'], // always join the group
     });
+
     if (!tag) throw new NotFoundException('Tag not found.');
     return tag;
   }

@@ -43,7 +43,10 @@ export class TagsService {
   }
 
   async getAll(user: User, query: QueryTagDto) {
-    const tags = await this.tagsRepo.findAll(query, user.id);
+    // Pass relations dynamically if you want to include the group
+    const relations = query.includeGroup ? ['group'] : [];
+    const tags = await this.tagsRepo.findAll(query, user.id, relations);
+
     return {
       success: true,
       message: 'Tags fetched successfully',
@@ -52,7 +55,9 @@ export class TagsService {
   }
 
   async getOne(id: number, user: User) {
+    // Already loads group by default
     const tag = await this.tagsRepo.findOneById(id, user.id);
+
     return {
       success: true,
       message: 'Tag fetched successfully',

@@ -1,4 +1,4 @@
-# 📘 **MindVault — Module Development Guide**
+# 📘 **MindVault — Module Development Guide **
 
 **For AI Agents & Developers (NestJS + TypeORM + RBAC + JWT)**
 
@@ -49,18 +49,59 @@ Each module **must** follow this expanded structure:
 
 # 🧱 **2. Entity Rules (Mandatory)**
 
-- Table names must be **snake_case**
-- Entity classes use **PascalCase**
-- Use **numeric auto-increment PKs**
-- Column names must be **snake_case**, entity fields **camelCase**
-- Use `jsonb` for flexible metadata if needed
+### ✔ Table names must be **snake_case**
+
+### ✔ Entity classes use **PascalCase**
+
+### ✔ Use **numeric auto-increment PKs**
 
 ```ts
 @PrimaryGeneratedColumn()
 id: number;
+```
 
+### ✔ Column names must be **snake_case**, entity fields **camelCase**
+
+```ts
 @Column({ type: 'varchar', length: 150, name: 'display_name' })
 displayName: string;
+```
+
+### ✔ Use `jsonb` for flexible metadata if needed
+
+---
+
+### Example Entity Pattern
+
+```ts
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from "typeorm";
+
+@Entity({ name: "people" })
+export class Person {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ type: "varchar", length: 100, name: "first_name" })
+  firstName: string;
+
+  @Column({ type: "varchar", length: 100, name: "last_name" })
+  lastName: string;
+
+  @Column({ type: "varchar", length: 150, nullable: true, name: "email" })
+  email?: string;
+
+  @CreateDateColumn({ type: "timestamp", name: "created_at" })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: "timestamp", name: "updated_at" })
+  updatedAt: Date;
+}
 ```
 
 ---
@@ -263,28 +304,6 @@ Avoid:
 - Direct entity returns
 - Modifying output shape in controller
 
----
-
-# 🌱 **15. Seeder & Data Folder Guidelines (Generic)**
-
-- Each module that requires default data **must have a `data/` folder** in the module root.
-
-  - This folder contains raw default data for seeding (TypeScript objects or JSON).
-
-- The **seeder** is responsible for populating the database:
-
-  - Imports data from `data/`
-  - Calls repository methods to insert data
-  - Can truncate or reset tables before seeding
-
-- **Benefits:**
-
-  - Keeps default data **centralized and reusable**
-  - Clean separation of **data vs. logic**
-  - Easy to update defaults without touching seeder logic
-
-### Example Seeder (Generic)
-
 ```ts
 import { Injectable } from '@nestjs/common';
 import { Command } from 'nestjs-command';
@@ -339,47 +358,16 @@ export const defaultData: Partial<<EntityName>>[] = [
    groupId?: number;
    ```
 
-2. **Dynamic relation loading**
-   Fetch relations only when requested, using query flags:
+Ensures modules are:
 
-   ```ts
-   relations.forEach((r) => qb.leftJoinAndSelect(`tag.${r}`, r));
-   ```
-
-3. **Always load relations for single entities**
-
-   ```ts
-   await this.repo.findOne({ where: { id }, relations: ["group"] });
-   ```
-
-4. **Query DTO flags**
-   Let the client control relations:
-
-   ```ts
-   @IsOptional() @IsBoolean() includeGroup?: boolean;
-   ```
-
-5. **Transformers for output**
-
-   - Use IDs in lists
-   - Include relational data in detailed responses
-
-   ```ts
-   groupId: tag.groupId,
-   groupName: tag.group?.displayName
-   ```
-
-**✅ Principle:**
-
-- Lists → IDs only (lightweight)
-- Single entity → load full relation
-- Keep control via query parameters
-
-> ✅ **Key points:**
->
-> - Data files are **pure data**, no logic
-> - Seeders handle insertion, table cleanup, and logging
-> - Modules can have multiple seeders if needed
+- Scalable
+- Consistent
+- Predictable
+- Future-proof
+- Event-ready
+- Safe for AI agents
+- Well-documented
+- Maintainable
 
 ---
 

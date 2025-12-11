@@ -35,9 +35,11 @@ export class TagsRepository {
       qb.andWhere('tag.isSystem = false');
     }
 
-    // Exclude deleted tags if not requested
-    if (!query.includeDeleted) {
-      qb.andWhere('tag.isDeleted = false');
+    // Soft-deleted filter
+    if (query.onlyDeleted) {
+      qb.andWhere('tag.isDeleted = true'); // Only soft-deleted
+    } else if (!query.includeDeleted) {
+      qb.andWhere('tag.isDeleted = false'); // Exclude soft-deleted
     }
 
     // User-specific tags or system tags
@@ -45,7 +47,7 @@ export class TagsRepository {
 
     // Pagination
     if (query.limit) qb.take(query.limit);
-    if (query.page) qb.skip((query.page - 1) * (query.limit || 0));
+    if (query.page && query.limit) qb.skip((query.page - 1) * query.limit);
 
     // Dynamically join relations
     relations.forEach((relation) => {

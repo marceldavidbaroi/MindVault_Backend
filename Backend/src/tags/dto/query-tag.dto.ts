@@ -39,6 +39,15 @@ export class QueryTagDto {
   includeDeleted?: boolean;
 
   @ApiPropertyOptional({
+    description: 'Return only soft-deleted tags',
+    example: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  onlyDeleted?: boolean;
+
+  @ApiPropertyOptional({
     description: 'Number of results to return per page',
     example: 10,
     minimum: 1,

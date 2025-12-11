@@ -5,58 +5,49 @@ import {
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import type { Response } from 'express';
-import { User } from '../entities/user.entity';
-import { UserSession } from '../entities/userSessions.entity';
-import { UserPreferences } from '../entities/userPreferences.entity';
+import { AuthValidator } from '../validator/auth.validator';
+import { AuthTransformer } from '../transformers/auth.transformer';
+import { generatePasskey } from '../utils/passkey.util';
 import { authCredentialsDto } from '../dto/auth-credentials.dto';
 import { SigninDto } from '../dto/sign-in.dto';
-import { generatePasskey } from '../utils/passkey.util';
-import { VerifyUserService } from './verify-user.service';
-
-export interface JwtPayload {
-  sub: number;
-  email?: string;
-  username: string;
-  exp?: number;
-  iat?: number;
-}
+import { UserValidator } from '../validator/user.validator';
+import { hashString } from 'src/common/utils/hash.util';
+import { UserRepository } from '../repository/user.repository';
+import { UserPreferencesRepository } from '../repository/user-preferences.repository';
+import { UserSessionRepository } from '../repository/user-session.repository';
+import { parseDuration } from '../utils/parse-duration.util';
 
 @Injectable()
 export class AuthService {
+  private readonly accessTokenExpiry =
+    process.env.JWT_ACCESS_TOKEN_EXPIRES || '1h';
+  private readonly refreshTokenExpiry =
+    process.env.JWT_REFRESH_TOKEN_EXPIRES || '7d';
+
   constructor(
-    @InjectRepository(User) private readonly userRepository: Repository<User>,
-    @InjectRepository(UserPreferences)
-    private readonly preferencesRepository: Repository<UserPreferences>,
-    @InjectRepository(UserSession)
-    private readonly userSessionRepository: Repository<UserSession>,
+    private readonly userRepo: UserRepository,
+    private readonly userPreferenceRepo: UserPreferencesRepository,
+    private readonly userSessionRepo: UserSessionRepository,
     private readonly jwtService: JwtService,
-    private readonly verifyUserService: VerifyUserService,
+    private readonly validator: AuthValidator,
+    private readonly userValidator: UserValidator,
+    private readonly transformer: AuthTransformer,
   ) {}
 
-  private async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, 10);
-  }
-
   // ------------------- SIGNUP -------------------
-  async signup(
-    authCredentialsDto: authCredentialsDto,
-  ): Promise<{ message: string; passkey: string }> {
-    const { username, password } = authCredentialsDto;
+  async signup(dto: authCredentialsDto) {
+    const { username, password } = dto;
 
-    const existingUser = await this.verifyUserService
-      .verify(username)
-      .catch(() => null);
+    // check if username exists
+    const existingUser = await this.userValidator.ensureUserExists(username);
     if (existingUser) throw new ConflictException('Username already exists');
 
-    const hashedPassword = await this.hashPassword(password);
+    const hashedPassword = await hashString(password);
     const passkey = generatePasskey();
 
-    const user = this.userRepository.create({
+    const user = this.userRepo.createUser({
       username,
       password: hashedPassword,
       passkey,
@@ -64,71 +55,67 @@ export class AuthService {
     });
 
     try {
-      const createdUser = await this.userRepository.save(user);
+      const createdUser = await this.userRepo.saveUser(user);
 
-      const preferences = this.preferencesRepository.create({
+      const preferences = this.userPreferenceRepo.createPreferences({
         user: createdUser,
         frontend: {},
         backend: {},
       });
-      await this.preferencesRepository.save(preferences);
 
-      return { message: 'Signup successful', passkey };
-    } catch (err) {
+      await this.userPreferenceRepo.savePreferences(preferences);
+
+      return {
+        success: true,
+        message: 'Signup successful',
+        data: { passkey },
+      };
+    } catch {
       throw new InternalServerErrorException('Error creating user');
     }
   }
 
   // ------------------- SIGNIN -------------------
-  async signin(
-    authCredentialsDto: SigninDto,
-    res: Response,
-    userAgent?: string,
-    ipAddress?: string,
-  ): Promise<{ user: Partial<User> }> {
-    const { username, password } = authCredentialsDto;
+  async signin(dto: SigninDto, res: Response, userAgent?: string, ip?: string) {
+    const { username, password } = dto;
 
-    let user: User;
-    try {
-      user = await this.verifyUserService.verify(username);
-    } catch (err) {
-      if (err.name === 'NotFoundException')
+    // get user using validator
+    const user = await this.userValidator
+      .ensureUserExists(username)
+      .catch(() => {
         throw new BadRequestException('Invalid username or password');
-      throw err;
-    }
+      });
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid)
-      throw new BadRequestException('Invalid username or password');
+    // check password
+    await this.validator.validatePassword(password, user);
 
-    const payload: JwtPayload = { sub: user.id, username };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    // generate tokens
+    const payload = { sub: user.id, username };
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.accessTokenExpiry,
+    });
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: this.refreshTokenExpiry,
+    });
 
-    const session = this.userSessionRepository.create({
+    const session = this.userSessionRepo.createSession({
       user,
-      refreshToken: await bcrypt.hash(refreshToken, 10),
+      refreshToken: await hashString(refreshToken),
       userAgent,
-      ipAddress,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
-    await this.userSessionRepository.save(session);
-
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000,
-    });
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      ipAddress: ip,
+      expiresAt: new Date(Date.now() + parseDuration(this.refreshTokenExpiry)),
     });
 
-    const { password: _, refreshToken: __, ...safeUser } = user;
-    return { user: safeUser };
+    await this.userSessionRepo.saveSession(session);
+
+    // set cookies
+    this.setCookies(res, accessToken, refreshToken);
+
+    return {
+      success: true,
+      message: 'Login successful',
+      data: this.transformer.safeUser(user),
+    };
   }
 
   // ------------------- REFRESH TOKEN -------------------
@@ -136,66 +123,79 @@ export class AuthService {
     if (!refreshToken)
       throw new UnauthorizedException('No refresh token provided');
 
-    let payload: JwtPayload;
+    let payload: any;
     try {
-      payload = this.jwtService.verify<JwtPayload>(refreshToken);
+      payload = this.jwtService.verify(refreshToken);
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const user = await this.verifyUserService.verify(payload.sub);
+    const user = await this.userValidator.ensureUserExists(payload.sub);
+    const session = await this.userSessionRepo.findSessionByUserId(user.id);
 
-    const session = await this.userSessionRepository.findOne({
-      where: { user: { id: user.id } },
-    });
-
-    if (
-      !session ||
-      !(await bcrypt.compare(refreshToken, session.refreshToken))
-    ) {
+    if (!session)
       throw new UnauthorizedException('Refresh token invalid or expired');
-    }
 
-    const { exp, iat, ...cleanPayload } = payload;
+    await this.validator.compareRefreshToken(
+      refreshToken,
+      session.refreshToken,
+    );
 
-    const newAccessToken = this.jwtService.sign(cleanPayload, {
-      expiresIn: '1h',
+    const clean = { sub: user.id, username: user.username };
+    const newAccess = this.jwtService.sign(clean, {
+      expiresIn: this.accessTokenExpiry,
     });
-    const newRefreshToken = this.jwtService.sign(cleanPayload, {
-      expiresIn: '7d',
-    });
-
-    session.refreshToken = await bcrypt.hash(newRefreshToken, 10);
-    session.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await this.userSessionRepository.save(session);
-
-    res.cookie('accessToken', newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000,
-    });
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+    const newRefresh = this.jwtService.sign(clean, {
+      expiresIn: this.refreshTokenExpiry,
     });
 
-    return { accessToken: newAccessToken };
+    session.refreshToken = await hashString(newRefresh);
+    session.expiresAt = new Date(
+      Date.now() + parseDuration(this.refreshTokenExpiry),
+    );
+    await this.userSessionRepo.saveSession(session);
+
+    this.setCookies(res, newAccess, newRefresh);
+
+    return {
+      success: true,
+      message: 'Token refreshed',
+      data: { accessToken: newAccess },
+    };
   }
 
   // ------------------- LOGOUT -------------------
   async logout(userId: number, refreshToken?: string, res?: Response) {
     if (refreshToken) {
-      await this.userSessionRepository.delete({ refreshToken });
+      await this.userSessionRepo.deleteSessionByRefresh(refreshToken);
     } else {
-      await this.userSessionRepository.delete({ user: { id: userId } });
+      await this.userSessionRepo.deleteSessions(userId);
     }
 
     if (res) {
       res.clearCookie('accessToken');
       res.clearCookie('refreshToken');
     }
+
+    return { success: true, message: 'Logged out', data: null };
+  }
+
+  // ------------------- COOKIE HELPER -------------------
+  private setCookies(res: Response, access: string, refresh: string) {
+    const production = process.env.NODE_ENV === 'production';
+
+    res.cookie('accessToken', access, {
+      httpOnly: true,
+      secure: production,
+      sameSite: 'strict',
+      maxAge: parseDuration(this.accessTokenExpiry),
+    });
+
+    res.cookie('refreshToken', refresh, {
+      httpOnly: true,
+      secure: production,
+      sameSite: 'strict',
+      maxAge: parseDuration(this.refreshTokenExpiry),
+    });
   }
 }

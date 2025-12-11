@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SecurityQuestionService } from '../security-question.service';
 import { VerifyUserService } from '../verify-user.service';
-import { User } from '../../entities/user.entity';
-import { UserSecurityQuestion } from '../../entities/userSecurityQuestion.entity';
+import { User } from '../../entity/user.entity';
+import { UserSecurityQuestion } from '../../entity/userSecurityQuestion.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';

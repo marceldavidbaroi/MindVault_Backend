@@ -1,11 +1,12 @@
+// profile.service.ts
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
-import { UserPreferences } from '../entities/userPreferences.entity';
-import { UserSecurityQuestion } from '../entities/userSecurityQuestion.entity';
-import { PasswordResetLog } from '../entities/passwordResetLog.entity';
-import { VerifyUserService } from './verify-user.service';
+import { ProfileValidator } from '../validator/profile.validator';
+import { User } from '../entity/user.entity';
+import { UserValidator } from '../validator/user.validator';
+import { AuthTransformer } from '../transformers/auth.transformer';
+import { ProfileTransformer } from '../transformers/profile.transformer';
+import { UserRepository } from '../repository/user.repository';
+import { UserPreferencesRepository } from '../repository/user-preferences.repository';
 
 interface FrontendPreferences {
   theme?: 'light' | 'dark';
@@ -21,38 +22,45 @@ interface BackendPreferences {
 @Injectable()
 export class ProfileService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly verifyUserService: VerifyUserService,
-    @InjectRepository(UserPreferences)
-    private readonly preferencesRepository: Repository<UserPreferences>,
+    private readonly validator: ProfileValidator,
+    private readonly userValidator: UserValidator,
+    private readonly authTransformer: AuthTransformer,
+    private readonly profileTransformer: ProfileTransformer,
+    private readonly userRepository: UserRepository,
+    private readonly userPreferencesRepo: UserPreferencesRepository,
   ) {}
 
-  // ------------------- PROFILE -------------------
+  // ------------------- GET PROFILE -------------------
   async getProfile(user: User) {
-    const currentUser = await this.verifyUserService.verify(user.id);
-
-    const { password, refreshToken, passkey, ...safeUser } = currentUser;
-    const preferences = currentUser.preferences || {
-      frontend: {},
-      backend: {},
-    };
+    const currentUser = await this.userValidator.ensureUserExists(user.id);
+    const safeUser = this.authTransformer.safeUser(currentUser);
+    const preferences = this.profileTransformer.formatPreferences(
+      currentUser.preferences,
+    );
 
     return {
-      ...safeUser,
-      preferences,
+      success: true,
+      message: 'Profile fetched successfully',
+      data: { ...safeUser, preferences: preferences },
     };
   }
 
+  // ------------------- UPDATE PROFILE -------------------
   async updateProfile(user: User, updateData: Partial<User>) {
-    const currentUser = await this.verifyUserService.verify(user.id);
-    Object.assign(currentUser, updateData);
-    await this.userRepository.save(currentUser);
+    this.validator.validateUpdateData(updateData);
 
-    const { password, refreshToken, passkey, ...safeUser } = currentUser;
-    return safeUser;
+    const currentUser = await this.userValidator.ensureUserExists(user.id);
+    Object.assign(currentUser, updateData);
+    await this.userRepository.saveUser(currentUser);
+
+    return {
+      success: true,
+      message: 'Profile updated successfully',
+      data: this.authTransformer.safeUser(currentUser),
+    };
   }
 
+  // ------------------- UPDATE PREFERENCES -------------------
   async updatePreferences(
     user: User,
     updateData: {
@@ -60,21 +68,26 @@ export class ProfileService {
       backend?: BackendPreferences;
     },
   ) {
-    const currentUser = await this.verifyUserService.verify(user.id);
+    const currentUser = await this.userValidator.ensureUserExists(user.id);
 
-    let prefs = currentUser.preferences;
-    if (!prefs) {
-      prefs = this.preferencesRepository.create({
+    let preferences = currentUser.preferences;
+    if (!preferences) {
+      preferences = this.userPreferencesRepo.createPreferences({
         user: currentUser,
         frontend: {},
         backend: {},
       });
     }
 
-    prefs.frontend = { ...prefs.frontend, ...updateData.frontend };
-    prefs.backend = { ...prefs.backend, ...updateData.backend };
-    await this.preferencesRepository.save(prefs);
+    preferences.frontend = { ...preferences.frontend, ...updateData.frontend };
+    preferences.backend = { ...preferences.backend, ...updateData.backend };
 
-    return prefs;
+    await this.userPreferencesRepo.savePreferences(preferences);
+
+    return {
+      success: true,
+      message: 'Preferences updated successfully',
+      data: this.profileTransformer.formatPreferences(preferences),
+    };
   }
 }

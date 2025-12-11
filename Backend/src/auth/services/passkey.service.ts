@@ -1,165 +1,118 @@
+// passkey.service.ts
 import {
   Injectable,
-  NotFoundException,
   BadRequestException,
-  UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
-import { User } from '../entities/user.entity';
-import { PasswordResetLog } from '../entities/passwordResetLog.entity';
+import { PasskeyValidator } from '../validator/passkey.validator';
 import { generatePasskey } from '../utils/passkey.util';
+import { User } from '../entity/user.entity';
+import * as bcrypt from 'bcrypt';
+import { UserValidator } from '../validator/user.validator';
+import { PasswordValidator } from '../validator/password.validator';
+import { PasswordResetLogRepository } from '../repository/password-reset-log.repository';
+import { UserRepository } from '../repository/user.repository';
 
 @Injectable()
 export class PasskeyService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    @InjectRepository(PasswordResetLog)
-    private readonly passwordResetLogRepository: Repository<PasswordResetLog>,
+    private readonly validator: PasskeyValidator,
+    private readonly userValidator: UserValidator,
+    private readonly passwordValidator: PasswordValidator,
+    private readonly passwordResetLogRepo: PasswordResetLogRepository,
+    private readonly userRepo: UserRepository,
   ) {}
 
-  // ------------------- PRIVATE HELPER -------------------
-  private async findUser(user: User): Promise<User> {
-    const currentUser = await this.userRepository.findOne({
-      where: { id: user.id },
-      select: [
-        'id',
-        'username',
-        'password',
-        'passkey',
-        'passkeyExpiresAt',
-        'refreshToken',
-      ],
-    });
-    if (!currentUser) throw new NotFoundException('User not found');
-    return currentUser;
-  }
+  // ------------------- GET PASSKEY -------------------
+  async getPasskey(user: User, password: string) {
+    const currentUser = await this.userValidator.ensureUserExists(user.id);
+    await this.passwordValidator.verifyPassword(currentUser, password);
 
-  // ------------------- PASSKEY -------------------
-
-  async getPasskey(
-    user: User,
-    password: string, // <-- password to verify
-  ): Promise<{ passkey?: string; expiresAt?: Date }> {
-    // Find the user in the database
-    const currentUser = await this.findUser(user);
-    if (!currentUser) {
-      throw new Error('User not found');
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      currentUser.password,
-    ); // use correct hashed password field
-    if (!isPasswordValid) {
-      throw new BadRequestException('Incorrect password');
-    }
-    if (!isPasswordValid) {
-      throw new Error('Invalid password');
-    }
-
-    // Return passkey if password is valid
     return {
-      passkey: currentUser.passkey,
-      expiresAt: currentUser.passkeyExpiresAt,
+      success: true,
+      message: 'Passkey fetched successfully',
+      data: {
+        passkey: currentUser.passkey,
+        expiresAt: currentUser.passkeyExpiresAt,
+      },
     };
   }
 
+  // ------------------- RESET PASSWORD WITH PASSKEY -------------------
   async resetPasswordWithPasskey(
     username: string,
     passkey: string,
     newPassword: string,
-  ): Promise<{ message: string; newPasskey: string }> {
-    // Find user by username
-    const currentUser = await this.userRepository.findOne({
-      where: { username },
-      select: [
-        'id',
-        'username',
-        'password',
-        'passkey',
-        'passkeyExpiresAt',
-        'refreshToken',
-      ],
-    });
+  ) {
+    const user = await this.userValidator.ensureUserExists(username);
 
-    if (!currentUser) {
-      throw new BadRequestException('User not found');
+    try {
+      await this.validator.verifyPasskey(user, passkey);
+    } catch (e) {
+      // log failed attempt
+      await this.passwordResetLogRepo.saveResetLog(
+        this.passwordResetLogRepo.createResetLog({
+          user,
+          method: 'passkey',
+          success: false,
+        }),
+      );
+      throw e;
     }
 
-    if (currentUser.passkey !== passkey) {
-      // Log failed attempt
-      await this.passwordResetLogRepository.save({
-        user: currentUser,
+    // reset password
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.passkey = generatePasskey();
+    user.passkeyExpiresAt = undefined;
+    user.refreshToken = undefined;
+    await this.userRepo.saveUser(user);
+
+    // log success
+    await this.passwordResetLogRepo.saveResetLog(
+      this.passwordResetLogRepo.createResetLog({
+        user,
         method: 'passkey',
-        success: false,
-      });
-
-      throw new BadRequestException('Invalid or expired passkey');
-    }
-
-    // Update password and reset passkey
-    currentUser.password = await bcrypt.hash(newPassword, 10);
-    currentUser.passkey = generatePasskey();
-    currentUser.passkeyExpiresAt = undefined;
-    currentUser.refreshToken = undefined;
-
-    await this.userRepository.save(currentUser);
-
-    // Log successful reset
-    await this.passwordResetLogRepository.save({
-      user: currentUser,
-      method: 'passkey',
-      success: true,
-    });
+        success: true,
+      }),
+    );
 
     return {
+      success: true,
       message: 'Password reset successfully',
-      newPasskey: currentUser.passkey,
+      data: { newPasskey: user.passkey },
     };
   }
 
+  // ------------------- CHANGE PASSWORD -------------------
   async changePassword(
     user: User,
     oldPassword: string,
     newPassword: string,
-    ipAddress?: string, // optional
-  ): Promise<{ message: string }> {
-    const currentUser = await this.findUser(user);
-
-    const isMatch = await bcrypt.compare(oldPassword, currentUser.password);
-    if (!isMatch) {
-      // Log failed manual change attempt
-      await this.passwordResetLogRepository.save({
-        user: currentUser,
-        method: 'manual',
-        success: false,
-        ipAddress,
-        note: 'Old password incorrect',
-      });
-
-      throw new BadRequestException('Old password is incorrect');
-    }
+    ipAddress?: string,
+  ) {
+    const currentUser = await this.userValidator.ensureUserExists(user.id);
+    await this.passwordValidator.verifyPassword(currentUser, oldPassword);
 
     currentUser.password = await bcrypt.hash(newPassword, 10);
     currentUser.passkey = generatePasskey();
     currentUser.passkeyExpiresAt = undefined;
     currentUser.refreshToken = undefined;
+    await this.userRepo.saveUser(currentUser);
 
-    await this.userRepository.save(currentUser);
+    // log success
+    await this.passwordResetLogRepo.saveResetLog(
+      this.passwordResetLogRepo.createResetLog({
+        user: currentUser,
+        method: 'manual',
+        success: true,
+        ipAddress,
+        note: 'User-initiated password change',
+      }),
+    );
 
-    // Log successful manual change
-    await this.passwordResetLogRepository.save({
-      user: currentUser,
-      method: 'manual',
+    return {
       success: true,
-      ipAddress,
-      note: 'User-initiated password change',
-    });
-
-    return { message: 'Password changed successfully' };
+      message: 'Password changed successfully',
+    };
   }
 }

@@ -16,7 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { PasskeyService } from '../services/passkey.service';
 import { GetUser } from '../get-user.decorator';
-import { User } from '../entities/user.entity';
+import { User } from '../entity/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import type { ApiResponse as ApiResponseType } from 'src/common/types/api-response.type';
 import { GetPasskeyDto } from '../dto/get-passkey.dto';
@@ -40,30 +40,12 @@ export class PasskeyController {
   @ApiResponse({
     status: 200,
     description: 'Passkey fetched successfully',
-    schema: {
-      example: {
-        success: true,
-        message: 'Passkey fetched successfully',
-        data: {
-          passkey: 'abcdef123456',
-          expiresAt: '2025-11-03T15:30:00.000Z',
-        },
-      },
-    },
   })
   async getPasskey(
     @GetUser() user: User,
     @Body() dto: GetPasskeyDto,
   ): Promise<ApiResponseType<{ passkey?: string; expiresAt?: Date }>> {
-    const passkeyData = await this.passkeyService.getPasskey(
-      user,
-      dto.password,
-    );
-    return {
-      success: true,
-      message: 'Passkey fetched successfully',
-      data: passkeyData,
-    };
+    return this.passkeyService.getPasskey(user, dto.password);
   }
 
   // ------------------- RESET PASSWORD USING PASSKEY -------------------
@@ -76,30 +58,18 @@ export class PasskeyController {
   @ApiResponse({
     status: 200,
     description: 'Password reset and new passkey generated successfully',
-    schema: {
-      example: {
-        success: true,
-        message: 'Password reset successfully',
-        data: { newPasskey: 'xyz987654321' },
-      },
-    },
   })
   async resetPasswordWithPasskey(
     @Body() dto: ResetPasswordWithPasskeyDto,
   ): Promise<ApiResponseType<{ newPasskey: string }>> {
-    const result = await this.passkeyService.resetPasswordWithPasskey(
+    return this.passkeyService.resetPasswordWithPasskey(
       dto.username,
       dto.passkey,
       dto.newPassword,
     );
-    return {
-      success: true,
-      message: result.message,
-      data: { newPasskey: result.newPasskey },
-    };
   }
 
-  // ------------------- CHANGE PASSWORD WITH OLD PASSWORD -------------------
+  // ------------------- CHANGE PASSWORD -------------------
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @Patch('/change')
@@ -111,27 +81,15 @@ export class PasskeyController {
   @ApiResponse({
     status: 200,
     description: 'Password changed successfully',
-    schema: {
-      example: {
-        success: true,
-        message: 'Password changed successfully',
-        data: null,
-      },
-    },
   })
   async changePassword(
     @GetUser() user: User,
     @Body() dto: ChangePasswordDto,
   ): Promise<ApiResponseType<null>> {
-    const result = await this.passkeyService.changePassword(
+    return this.passkeyService.changePassword(
       user,
       dto.oldPassword,
       dto.newPassword,
     );
-    return {
-      success: true,
-      message: result.message,
-      data: null,
-    };
   }
 }

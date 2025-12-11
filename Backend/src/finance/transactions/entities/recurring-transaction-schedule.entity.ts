@@ -7,7 +7,7 @@ import {
   ManyToOne,
 } from 'typeorm';
 import { Transaction } from './transaction.entity';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 
 @Entity('recurring_transaction_schedules')
 export class RecurringTransactionSchedule {

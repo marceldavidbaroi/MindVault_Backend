@@ -15,7 +15,7 @@ import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,

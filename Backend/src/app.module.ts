@@ -12,7 +12,13 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 @Module({
-  imports: [TypeOrmModule.forRoot(typeOrmConfig), AuthModule, FinanceModule, RolesModule, TagsModule],
+  imports: [
+    TypeOrmModule.forRoot(typeOrmConfig),
+    AuthModule,
+    FinanceModule,
+    RolesModule,
+    TagsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

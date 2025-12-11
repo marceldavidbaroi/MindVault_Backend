@@ -11,7 +11,7 @@ import { AuthService } from '../services/auth.service';
 import { authCredentialsDto } from '../dto/auth-credentials.dto';
 import { SigninDto } from '../dto/sign-in.dto';
 import { GetUser } from '../get-user.decorator';
-import { User } from '../entities/user.entity';
+import { User } from '../entity/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import type { ApiResponse } from 'src/common/types/api-response.type';
@@ -37,13 +37,8 @@ export class AuthController {
     description: 'User registered successfully',
   })
   @ApiBody({ type: authCredentialsDto })
-  async signUp(@Body() dto: authCredentialsDto): Promise<ApiResponse<null>> {
-    const result = await this.authService.signup(dto);
-    return {
-      success: true,
-      message: result.message,
-      data: null,
-    };
+  async signUp(@Body() dto: authCredentialsDto): Promise<ApiResponse<any>> {
+    return this.authService.signup(dto);
   }
 
   // ------------------- SIGNIN -------------------
@@ -62,17 +57,8 @@ export class AuthController {
   ): Promise<ApiResponse<Partial<User>>> {
     const userAgent = req.headers['user-agent'];
     const ipAddress = req.ip;
-    const { user } = await this.authService.signin(
-      dto,
-      res,
-      userAgent,
-      ipAddress,
-    );
-    return {
-      success: true,
-      message: 'User signed in successfully',
-      data: user,
-    };
+
+    return this.authService.signin(dto, res, userAgent, ipAddress);
   }
 
   // ------------------- REFRESH TOKEN -------------------
@@ -86,16 +72,11 @@ export class AuthController {
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<ApiResponse<null>> {
+  ): Promise<ApiResponse<any>> {
     const refreshToken = req.cookies['refreshToken'];
     if (!refreshToken) throw new UnauthorizedException('No refresh token');
 
-    await this.authService.refreshAccessToken(refreshToken, res);
-    return {
-      success: true,
-      message: 'Access token refreshed successfully',
-      data: null,
-    };
+    return this.authService.refreshAccessToken(refreshToken, res);
   }
 
   // ------------------- LOGOUT -------------------
@@ -114,11 +95,6 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<ApiResponse<null>> {
     const refreshToken = req.cookies['refreshToken'];
-    await this.authService.logout(user.id, refreshToken, res);
-    return {
-      success: true,
-      message: 'User logged out successfully',
-      data: null,
-    };
+    return this.authService.logout(user.id, refreshToken, res);
   }
 }

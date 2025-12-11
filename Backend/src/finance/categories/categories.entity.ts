@@ -9,7 +9,7 @@ import {
   Index,
   OneToMany,
 } from 'typeorm';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
 import { MonthlyCategorySummary } from '../summary/entity/monthly-category-summary.entity';
 import { DailyCategorySummary } from '../summary/entity/daily-category-summary.entity';

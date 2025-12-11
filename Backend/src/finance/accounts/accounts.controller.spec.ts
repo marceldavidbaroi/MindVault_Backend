@@ -3,7 +3,7 @@ import { AccountsController } from './accounts.controller';
 import { AccountsService } from './services/accounts.service';
 import { AccountTypesService } from './services/account-types.service';
 import { AccountUserRolesService } from './services/account-user-roles.service.service';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';

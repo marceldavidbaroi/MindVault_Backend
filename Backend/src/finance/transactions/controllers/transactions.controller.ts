@@ -22,7 +22,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { GetUser } from 'src/auth/get-user.decorator';
 import { BulkCreateTransactionDto } from '../dto/bulk-create-transaction.dto'; // make sure this exists
 import { CreateTransactionDto } from '../dto/create-transaction.dto';

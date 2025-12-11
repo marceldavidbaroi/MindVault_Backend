@@ -8,7 +8,7 @@ import { Repository, DataSource, EntityManager } from 'typeorm';
 import { AccountLedger } from '../entities/ledger.entity';
 import { Account } from 'src/finance/accounts/entity/account.entity';
 import { Transaction } from '../entities/transaction.entity';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
 import { AccountsService } from 'src/finance/accounts/services/accounts.service';
 

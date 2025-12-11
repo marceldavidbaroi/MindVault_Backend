@@ -1,122 +1,141 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { User } from '../entities/user.entity';
-import { UserSecurityQuestion } from '../entities/userSecurityQuestion.entity';
-import { VerifyUserService } from './verify-user.service';
+import { SecurityQuestionValidator } from '../validator/security-question.validator';
+import { UserValidator } from '../validator/user.validator';
+import { UserSecurityQuestionRepository } from '../repository/user-security-question.repository';
+import { SecurityQuestionTransformer } from '../transformers/security-question.transformer';
+import { UserRepository } from '../repository/user.repository';
 
 @Injectable()
 export class SecurityQuestionService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly verifyUserService: VerifyUserService,
-    @InjectRepository(UserSecurityQuestion)
-    private readonly questionsRepository: Repository<UserSecurityQuestion>,
+    private readonly validator: SecurityQuestionValidator,
+    private readonly userValidator: UserValidator,
+    private readonly securityQuestionRepo: UserSecurityQuestionRepository,
+    private readonly securityQuestionTransformer: SecurityQuestionTransformer,
+    private readonly userRepository: UserRepository,
   ) {}
 
-  // ------------------- PASSWORD VERIFICATION -------------------
-  private async verifyPassword(
-    userId: number,
-    password: string,
-  ): Promise<void> {
-    const currentUser = await this.verifyUserService.verify(userId);
+  // -------------------------------------------------------
+  // GET QUESTIONS
+  // -------------------------------------------------------
+  async getSecurityQuestions(userId: number) {
+    await this.userValidator.ensureUserExists(userId);
 
-    const isMatch = await bcrypt.compare(password, currentUser.password);
-    if (!isMatch) throw new BadRequestException('Invalid password');
+    const questions =
+      await this.securityQuestionRepo.findQuestionsByUserId(userId);
+
+    const transformed = questions.map((q) =>
+      this.securityQuestionTransformer.toPublicQuestion(q),
+    );
+
+    return {
+      success: true,
+      message: 'Security questions retrieved successfully.',
+      data: transformed,
+    };
   }
 
-  // ------------------- SECURITY QUESTIONS -------------------
-  async getSecurityQuestions(userId: number): Promise<UserSecurityQuestion[]> {
-    await this.verifyUserService.verify(userId);
-    return this.questionsRepository.find({ where: { user: { id: userId } } });
-  }
-
+  // -------------------------------------------------------
+  // CREATE QUESTION
+  // -------------------------------------------------------
   async createSecurityQuestion(
     userId: number,
     question: string,
     answer: string,
     password: string,
-  ): Promise<any> {
-    const user = await this.verifyUserService.verify(userId);
-    await this.verifyPassword(user.id, password);
+  ) {
+    const user = await this.userValidator.ensureUserExists(userId);
 
-    const count = await this.questionsRepository.count({
-      where: { user: { id: user.id } },
-    });
-    if (count >= 3)
-      throw new BadRequestException('Maximum 3 questions allowed');
+    await this.validator.verifyPassword(user, password);
+
+    const count = await this.securityQuestionRepo.countQuestionsByUser(userId);
+    await this.validator.checkQuestionLimit(count);
 
     const hashedAnswer = await bcrypt.hash(answer, 10);
-    const newQuestion = this.questionsRepository.create({
+
+    const questionEntity = this.securityQuestionRepo.createQuestion({
       user,
       question,
       answerHash: hashedAnswer,
     });
-    const saved = await this.questionsRepository.save(newQuestion);
+
+    const saved = await this.securityQuestionRepo.saveQuestion(questionEntity);
 
     if (!user.hasSecurityQuestions) {
       user.hasSecurityQuestions = true;
-      await this.userRepository.save(user);
+      await this.userRepository.saveUser(user);
     }
 
-    const { id, username, email } = saved.user;
     return {
-      id: saved.id,
-      user: { id, username, email },
-      question: saved.question,
-      createdAt: saved.createdAt,
-      updatedAt: saved.updatedAt,
+      success: true,
+      message: 'Security question created successfully.',
+      data: this.securityQuestionTransformer.toPublicQuestion(saved),
     };
   }
 
+  // -------------------------------------------------------
+  // UPDATE QUESTION
+  // -------------------------------------------------------
   async updateSecurityQuestion(
     userId: number,
     questionId: number,
     question: string,
     answer: string,
     password: string,
-  ): Promise<UserSecurityQuestion> {
-    await this.verifyPassword(userId, password);
+  ) {
+    const user = await this.userValidator.ensureUserExists(userId);
+    await this.validator.verifyPassword(user, password);
 
-    const questionEntity = await this.questionsRepository.findOne({
-      where: { id: questionId, user: { id: userId } },
-    });
-    if (!questionEntity) throw new NotFoundException('Question not found');
+    const questionEntity = this.validator.ensureQuestionExists(
+      await this.securityQuestionRepo.findQuestionById(questionId, userId),
+    );
+    // ensureQuestionExists throws if not found
+    this.validator.ensureQuestionExists(questionEntity);
 
     questionEntity.question = question;
     questionEntity.answerHash = await bcrypt.hash(answer, 10);
-    return this.questionsRepository.save(questionEntity);
+
+    const updated =
+      await this.securityQuestionRepo.saveQuestion(questionEntity);
+
+    return {
+      success: true,
+      message: 'Security question updated successfully.',
+      data: this.securityQuestionTransformer.toPublicQuestion(updated),
+    };
   }
 
+  // -------------------------------------------------------
+  // DELETE QUESTION
+  // -------------------------------------------------------
   async deleteSecurityQuestion(
     userId: number,
     questionId: number,
     password: string,
-  ): Promise<void> {
-    await this.verifyPassword(userId, password);
+  ) {
+    const user = await this.userValidator.ensureUserExists(userId);
+    await this.validator.verifyPassword(user, password);
 
-    const questionEntity = await this.questionsRepository.findOne({
-      where: { id: questionId, user: { id: userId } },
-    });
-    if (!questionEntity) throw new NotFoundException('Question not found');
+    const questionEntity = this.validator.ensureQuestionExists(
+      await this.securityQuestionRepo.findQuestionById(questionId, userId),
+    );
 
-    await this.questionsRepository.remove(questionEntity);
+    this.validator.ensureQuestionExists(questionEntity);
 
-    const remaining = await this.questionsRepository.count({
-      where: { user: { id: userId } },
-    });
-    if (remaining === 0) {
-      const user = await this.verifyUserService.verify(userId);
-      if (user.hasSecurityQuestions) {
-        user.hasSecurityQuestions = false;
-        await this.userRepository.save(user);
-      }
+    await this.securityQuestionRepo.removeQuestion(questionEntity);
+
+    const remaining =
+      await this.securityQuestionRepo.countQuestionsByUser(userId);
+
+    if (remaining === 0 && user.hasSecurityQuestions) {
+      user.hasSecurityQuestions = false;
+      await this.userRepository.saveUser(user);
     }
+
+    return {
+      success: true,
+      message: 'Security question deleted successfully.',
+    };
   }
 }

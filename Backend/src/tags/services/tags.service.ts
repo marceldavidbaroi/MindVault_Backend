@@ -3,7 +3,7 @@ import { TagsRepository } from '../repository/tags.repository';
 import { TagsValidator } from '../validators/tags.validator';
 import { TagsTransformer } from '../transformers/tags.transformer';
 import { CreateTagDto, UpdateTagDto, QueryTagDto } from '../dto/shared.dto';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 
 @Injectable()
 export class TagsService {

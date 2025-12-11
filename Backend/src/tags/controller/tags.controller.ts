@@ -19,7 +19,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { TagsService } from '../services/tags.service';
 import { CreateTagDto, UpdateTagDto, QueryTagDto } from '../dto/shared.dto';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { GetUser } from 'src/auth/get-user.decorator';
 import { ApiResponse as ResponseType } from 'src/common/types/api-response.type';
 

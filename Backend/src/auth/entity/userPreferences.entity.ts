@@ -13,8 +13,8 @@ export class UserPreferences extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @OneToOne(() => User, (user) => user.preferences, { onDelete: 'CASCADE' })
-  @JoinColumn()
+  @OneToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @Column({ type: 'json', default: {} })

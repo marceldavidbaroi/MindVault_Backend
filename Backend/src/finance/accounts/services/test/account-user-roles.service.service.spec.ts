@@ -6,7 +6,7 @@ import { AccountsService } from '../accounts.service';
 import { RolesService } from 'src/roles/roles.service';
 import { VerifyUserService } from 'src/auth/services/verify-user.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { Account } from '../../entity/account.entity';
 import {
   NotFoundException,

@@ -2,7 +2,7 @@
 
 **For AI Agents & Developers (NestJS + TypeORM + RBAC + JWT)**
 
-This guide defines the **standard architecture**, **patterns**, and **return rules** for building modules in MindVault.
+This guide defines the **standard architecture**, **patterns, and return rules** for building modules in MindVault.
 It ensures every module is:
 
 - Predictable
@@ -38,6 +38,10 @@ Each module **must** follow this expanded structure:
 │     ├── update-*.dto.ts
 │     ├── query-*.dto.ts
 │     └── shared.dto.ts
+│── data/
+│     └── <module>.data.ts      # default data for seeding
+│── seeder/
+│     └── <module>.seeder.ts    # seeder to populate default data
 │── <module>.module.ts
 ```
 
@@ -300,9 +304,59 @@ Avoid:
 - Direct entity returns
 - Modifying output shape in controller
 
----
+```ts
+import { Injectable } from '@nestjs/common';
+import { Command } from 'nestjs-command';
+import { <ModuleName>Repository } from '../repository/<module-name>.repository';
+import { defaultData } from '../data/<module-name>.data';
 
-# 🏁 Final Notes
+@Injectable()
+export class <ModuleName>Seeder {
+  constructor(private readonly repository: <ModuleName>Repository) {}
+
+  @Command({ command: '<module-name>:seed', describe: 'Seed default data' })
+  async seed() {
+    await this.repository.truncate(); // optional
+    await this.repository.saveMany(defaultData);
+    console.log('✅ Default data seeded!');
+  }
+}
+```
+
+### Example Data File (Generic)
+
+```ts
+import { <EntityName> } from '../entity/<entity-name>.entity';
+
+export const defaultData: Partial<<EntityName>>[] = [
+  {
+    name: 'example_1',
+    displayName: 'Example 1',
+    description: 'Description for example 1',
+    isSystem: true,
+  },
+  {
+    name: 'example_2',
+    displayName: 'Example 2',
+    description: 'Description for example 2',
+    isSystem: true,
+  },
+];
+```
+
+# 🧱 **Entity Relations **
+
+1. **Store IDs separately**
+   Always keep the foreign key in a column, even with a relation:
+
+   ```ts
+   @ManyToOne(() => TagGroup)
+   @JoinColumn({ name: 'group_id' })
+   group?: TagGroup;
+
+   @Column({ type: 'int', nullable: true, name: 'group_id' })
+   groupId?: number;
+   ```
 
 Ensures modules are:
 
@@ -316,3 +370,16 @@ Ensures modules are:
 - Maintainable
 
 ---
+
+# 🏁 **Final Notes**
+
+Ensures modules are:
+
+- Scalable
+- Consistent
+- Predictable
+- Future-proof
+- Event-ready
+- Safe for AI agents
+- Well-documented
+- Maintainable

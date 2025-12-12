@@ -4,7 +4,7 @@ import { User } from '../entity/user.entity';
 @Injectable()
 export class AuthTransformer {
   safeUser(user: User): Partial<User> {
-    const { password, refreshToken, ...safe } = user;
+    const { password, refreshToken, passkey, passkeyExpiresAt, ...safe } = user;
     return safe;
   }
 }

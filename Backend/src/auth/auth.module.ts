@@ -48,6 +48,7 @@ import { SecurityQuestionTransformer } from './transformers/security-question.tr
 
 // Other
 import { JwtStrategy } from './jwt.strategy';
+import { UserAuthValidator } from './validator/user-auth.validator';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { JwtStrategy } from './jwt.strategy';
     PasswordValidator,
     ProfileValidator,
     SecurityQuestionValidator,
+    UserAuthValidator,
 
     // Transformers
     AuthTransformer,

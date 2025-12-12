@@ -1,4 +1,3 @@
-// user.validator.ts
 import {
   BadRequestException,
   Injectable,
@@ -8,11 +7,13 @@ import { User } from '../entity/user.entity';
 import { UserRepository } from '../repository/user.repository';
 
 @Injectable()
-export class UserValidator {
+export class UserAuthValidator {
   constructor(private readonly repo: UserRepository) {}
 
-  async ensureUserExists(idOrUsername: number | string): Promise<User> {
-    const user = await this.repo.findUserByIdOrUsername(idOrUsername);
+  async ensureUserExistsForLogin(idOrUsername: number | string): Promise<User> {
+    const user =
+      await this.repo.findUserByIdOrUsernameWithPassword(idOrUsername);
+
     if (!user) {
       throw new NotFoundException(
         typeof idOrUsername === 'number'
@@ -24,11 +25,11 @@ export class UserValidator {
     return user;
   }
 
-  async ensureUserExistsWithPreferences(userId: number) {
-    const user = await this.repo.findUserWithPreferences(userId);
-    if (!user) {
-      throw new NotFoundException(`User with id ${userId} not found`);
+  async ensureUsernameNotTaken(username: string): Promise<void> {
+    const user = await this.repo.findUserByUsername(username);
+
+    if (user) {
+      throw new BadRequestException(`Username "${username}" is already taken`);
     }
-    return user;
   }
 }

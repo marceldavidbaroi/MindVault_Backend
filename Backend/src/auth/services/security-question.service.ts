@@ -5,12 +5,13 @@ import { UserValidator } from '../validator/user.validator';
 import { UserSecurityQuestionRepository } from '../repository/user-security-question.repository';
 import { SecurityQuestionTransformer } from '../transformers/security-question.transformer';
 import { UserRepository } from '../repository/user.repository';
+import { UserAuthValidator } from '../validator/user-auth.validator';
 
 @Injectable()
 export class SecurityQuestionService {
   constructor(
     private readonly validator: SecurityQuestionValidator,
-    private readonly userValidator: UserValidator,
+    private readonly userAuthValidator: UserAuthValidator,
     private readonly securityQuestionRepo: UserSecurityQuestionRepository,
     private readonly securityQuestionTransformer: SecurityQuestionTransformer,
     private readonly userRepository: UserRepository,
@@ -20,7 +21,7 @@ export class SecurityQuestionService {
   // GET QUESTIONS
   // -------------------------------------------------------
   async getSecurityQuestions(userId: number) {
-    await this.userValidator.ensureUserExists(userId);
+    await this.userAuthValidator.ensureUserExistsForLogin(userId);
 
     const questions =
       await this.securityQuestionRepo.findQuestionsByUserId(userId);
@@ -45,7 +46,7 @@ export class SecurityQuestionService {
     answer: string,
     password: string,
   ) {
-    const user = await this.userValidator.ensureUserExists(userId);
+    const user = await this.userAuthValidator.ensureUserExistsForLogin(userId);
 
     await this.validator.verifyPassword(user, password);
 
@@ -84,7 +85,7 @@ export class SecurityQuestionService {
     answer: string,
     password: string,
   ) {
-    const user = await this.userValidator.ensureUserExists(userId);
+    const user = await this.userAuthValidator.ensureUserExistsForLogin(userId);
     await this.validator.verifyPassword(user, password);
 
     const questionEntity = this.validator.ensureQuestionExists(
@@ -114,7 +115,7 @@ export class SecurityQuestionService {
     questionId: number,
     password: string,
   ) {
-    const user = await this.userValidator.ensureUserExists(userId);
+    const user = await this.userAuthValidator.ensureUserExistsForLogin(userId);
     await this.validator.verifyPassword(user, password);
 
     const questionEntity = this.validator.ensureQuestionExists(

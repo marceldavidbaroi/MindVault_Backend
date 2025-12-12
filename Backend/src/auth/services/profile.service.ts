@@ -32,7 +32,8 @@ export class ProfileService {
 
   // ------------------- GET PROFILE -------------------
   async getProfile(user: User) {
-    const currentUser = await this.userValidator.ensureUserExists(user.id);
+    const currentUser =
+      await this.userValidator.ensureUserExistsWithPreferences(user.id);
     const safeUser = this.authTransformer.safeUser(currentUser);
     const preferences = this.profileTransformer.formatPreferences(
       currentUser.preferences,
@@ -68,9 +69,11 @@ export class ProfileService {
       backend?: BackendPreferences;
     },
   ) {
-    const currentUser = await this.userValidator.ensureUserExists(user.id);
+    const currentUser =
+      await this.userValidator.ensureUserExistsWithPreferences(user.id);
 
     let preferences = currentUser.preferences;
+
     if (!preferences) {
       preferences = this.userPreferencesRepo.createPreferences({
         user: currentUser,

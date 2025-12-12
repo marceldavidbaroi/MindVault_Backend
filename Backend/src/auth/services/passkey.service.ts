@@ -1,31 +1,31 @@
 // passkey.service.ts
-import {
-  Injectable,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PasskeyValidator } from '../validator/passkey.validator';
 import { generatePasskey } from '../utils/passkey.util';
 import { User } from '../entity/user.entity';
-import * as bcrypt from 'bcrypt';
 import { UserValidator } from '../validator/user.validator';
 import { PasswordValidator } from '../validator/password.validator';
 import { PasswordResetLogRepository } from '../repository/password-reset-log.repository';
 import { UserRepository } from '../repository/user.repository';
+import { hashString } from 'src/common/utils/hash.util';
+import { UserAuthValidator } from '../validator/user-auth.validator';
 
 @Injectable()
 export class PasskeyService {
   constructor(
-    private readonly validator: PasskeyValidator,
+    private readonly passkeyValidator: PasskeyValidator,
     private readonly userValidator: UserValidator,
     private readonly passwordValidator: PasswordValidator,
     private readonly passwordResetLogRepo: PasswordResetLogRepository,
     private readonly userRepo: UserRepository,
+    private readonly userAuthValidator: UserAuthValidator,
   ) {}
 
   // ------------------- GET PASSKEY -------------------
   async getPasskey(user: User, password: string) {
-    const currentUser = await this.userValidator.ensureUserExists(user.id);
+    const currentUser = await this.userAuthValidator.ensureUserExistsForLogin(
+      user.id,
+    );
     await this.passwordValidator.verifyPassword(currentUser, password);
 
     return {
@@ -44,10 +44,11 @@ export class PasskeyService {
     passkey: string,
     newPassword: string,
   ) {
-    const user = await this.userValidator.ensureUserExists(username);
+    const user =
+      await this.userAuthValidator.ensureUserExistsForLogin(username);
 
     try {
-      await this.validator.verifyPasskey(user, passkey);
+      await this.passkeyValidator.verifyPasskey(user, passkey);
     } catch (e) {
       // log failed attempt
       await this.passwordResetLogRepo.saveResetLog(
@@ -61,7 +62,7 @@ export class PasskeyService {
     }
 
     // reset password
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password = await hashString(newPassword);
     user.passkey = generatePasskey();
     user.passkeyExpiresAt = undefined;
     user.refreshToken = undefined;
@@ -90,10 +91,15 @@ export class PasskeyService {
     newPassword: string,
     ipAddress?: string,
   ) {
-    const currentUser = await this.userValidator.ensureUserExists(user.id);
-    await this.passwordValidator.verifyPassword(currentUser, oldPassword);
-
-    currentUser.password = await bcrypt.hash(newPassword, 10);
+    const currentUser = await this.userAuthValidator.ensureUserExistsForLogin(
+      user.id,
+    );
+    await this.passkeyValidator.validatePasswordChange(
+      currentUser,
+      oldPassword,
+      newPassword,
+    );
+    currentUser.password = await hashString(newPassword);
     currentUser.passkey = generatePasskey();
     currentUser.passkeyExpiresAt = undefined;
     currentUser.refreshToken = undefined;

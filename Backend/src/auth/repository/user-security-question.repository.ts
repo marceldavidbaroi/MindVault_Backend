@@ -12,12 +12,16 @@ export class UserSecurityQuestionRepository {
   ) {}
 
   findQuestionsByUserId(userId: number) {
-    return this.repo.find({ where: { user: { id: userId } } });
+    return this.repo.find({
+      where: { user: { id: userId } },
+      relations: ['user'],
+    });
   }
 
   async findQuestionById(questionId: number, userId: number) {
     const result = await this.repo.findOne({
       where: { id: questionId, user: { id: userId } },
+      relations: ['user'],
     });
 
     return result ?? undefined;

@@ -18,6 +18,7 @@ import { UserRepository } from '../repository/user.repository';
 import { UserPreferencesRepository } from '../repository/user-preferences.repository';
 import { UserSessionRepository } from '../repository/user-session.repository';
 import { parseDuration } from '../utils/parse-duration.util';
+import { UserAuthValidator } from '../validator/user-auth.validator';
 
 @Injectable()
 export class AuthService {
@@ -34,6 +35,7 @@ export class AuthService {
     private readonly validator: AuthValidator,
     private readonly userValidator: UserValidator,
     private readonly transformer: AuthTransformer,
+    private readonly userAuthValidator: UserAuthValidator,
   ) {}
 
   // ------------------- SIGNUP -------------------
@@ -42,7 +44,7 @@ export class AuthService {
 
     // check if username exists
     const existingUser =
-      await this.userValidator.ensureUsernameNotTaken(username);
+      await this.userAuthValidator.ensureUsernameNotTaken(username);
 
     const hashedPassword = await hashString(password);
     const passkey = generatePasskey();
@@ -80,7 +82,7 @@ export class AuthService {
     const { username, password } = dto;
 
     // get user using validator
-    const user = await this.userValidator
+    const user = await this.userAuthValidator
       .ensureUserExistsForLogin(username)
       .catch(() => {
         throw new BadRequestException('Invalid username or password');

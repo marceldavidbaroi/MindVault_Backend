@@ -53,7 +53,20 @@ export class UserRepository {
 
     return this.repo.findOne({
       where,
-      select: ['id', 'username', 'email', 'password'], // 👈 ADD PASSWORD HERE
+      select: [
+        'id',
+        'username',
+        'email',
+        'password',
+        'passkey',
+        'passkeyExpiresAt',
+      ],
+    });
+  }
+  findUserWithPreferences(id: number) {
+    return this.repo.findOne({
+      where: { id },
+      relations: ['preferences'],
     });
   }
 }

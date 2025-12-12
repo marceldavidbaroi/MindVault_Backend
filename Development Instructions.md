@@ -358,6 +358,27 @@ export const defaultData: Partial<<EntityName>>[] = [
    groupId?: number;
    ```
 
+   **Benefits:**
+
+1. **Direct access without a join**
+   You can read `entity.groupId` without fetching the full relation.
+
+1. **Faster queries**
+   Filtering by foreign key (`findBy({ groupId: 5 })`) does not require a JOIN.
+
+1. **Cleaner, safer TypeScript code**
+   Avoids unnecessary query builder complexity when only the ID is needed.
+
+1. **Flexibility for other modules**
+   Other modules can reference the FK directly without loading related entities.
+
+1. **Consistency across entities**
+   Ensures all relations follow the same pattern, making the codebase predictable and maintainable.
+
+> ⚠️ **Rule:** Always declare both the FK column and the relation for any frequently queried or referenced relationship.
+
+---
+
 Ensures modules are:
 
 - Scalable

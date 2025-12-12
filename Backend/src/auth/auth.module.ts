@@ -112,6 +112,7 @@ import { UserAuthValidator } from './validator/user-auth.validator';
     UserValidator,
     AuthValidator,
     AuthTransformer,
+    PasswordValidator,
   ],
 })
 export class AuthModule {}

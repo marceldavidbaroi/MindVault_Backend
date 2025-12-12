@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForgotPasswordService } from '../forgot-password.service';
 import { VerifyUserService } from '../verify-user.service';
-import { User } from '../../entities/user.entity';
-import { UserSecurityQuestion } from '../../entities/userSecurityQuestion.entity';
-import { PasswordResetLog } from '../../entities/passwordResetLog.entity';
+import { User } from '../../entity/user.entity';
+import { UserSecurityQuestion } from '../../entity/userSecurityQuestion.entity';
+import { PasswordResetLog } from '../../entity/passwordResetLog.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';

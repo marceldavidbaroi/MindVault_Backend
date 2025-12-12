@@ -10,7 +10,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Account } from 'src/finance/accounts/entity/account.entity';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { Category } from 'src/finance/categories/categories.entity';
 import { Currency } from 'src/finance/currency/entity/currency.entity';
 

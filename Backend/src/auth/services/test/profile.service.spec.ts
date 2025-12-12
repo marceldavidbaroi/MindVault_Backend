@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProfileService } from '../profile.service';
 import { VerifyUserService } from '../verify-user.service';
-import { User } from '../../entities/user.entity';
-import { UserPreferences } from '../../entities/userPreferences.entity';
+import { User } from '../../entity/user.entity';
+import { UserPreferences } from '../../entity/userPreferences.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';

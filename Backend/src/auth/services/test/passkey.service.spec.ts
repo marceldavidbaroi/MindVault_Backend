@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PasskeyService } from '../passkey.service';
 import { Repository } from 'typeorm';
-import { User } from '../../entities/user.entity';
-import { PasswordResetLog } from '../../entities/passwordResetLog.entity';
+import { User } from '../../entity/user.entity';
+import { PasswordResetLog } from '../../entity/passwordResetLog.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';

@@ -7,7 +7,7 @@ import {
   UpdateTagGroupDto,
   QueryTagGroupDto,
 } from '../dto/shared.dto';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 
 @Injectable()
 export class TagGroupsService {

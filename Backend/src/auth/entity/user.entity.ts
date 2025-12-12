@@ -9,16 +9,6 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { UserPreferences } from './userPreferences.entity';
-// import { Transactions } from 'src/finance/transactions/transactions.entity';
-// import { Budgets } from 'src/finance/budgets/budgets.entity';
-// import { SavingsGoals } from 'src/finance/savings-goals/savings-goals.entity';
-// import { Reports } from 'src/finance/reports/reports.entity';
-// import { Category } from 'src/finance/categories/categories.entity';
-// import { DailySummary } from 'src/finance/summary/daily_summary.entity';
-// import { MonthlySummary } from 'src/finance/summary/monthly_summary.entity';
-// import { MonthlyCategorySummary } from 'src/finance/summary/category_monthly_summary.entity';
-// import { AccountType } from 'src/finance/account_types/account_types.entity';
-// import { Account } from 'src/finance/account/account.entity';
 import { UserSecurityQuestion } from './userSecurityQuestion.entity';
 import { PasswordResetLog } from './passwordResetLog.entity';
 import { UserSession } from './userSessions.entity';

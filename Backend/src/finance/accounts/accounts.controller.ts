@@ -17,7 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { ApiResponse } from 'src/common/types/api-response.type';
 import { AccountsService } from './services/accounts.service';
 import { AccountTypesService } from './services/account-types.service';

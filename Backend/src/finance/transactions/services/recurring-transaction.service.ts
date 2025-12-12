@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RecurringTransactionSchedule } from '../entities/recurring-transaction-schedule.entity';
 import { Transaction } from '../entities/transaction.entity';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 
 @Injectable()
 export class RecurringTransactionService {

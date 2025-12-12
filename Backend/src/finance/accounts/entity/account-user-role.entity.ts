@@ -11,7 +11,7 @@ import {
   Unique,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { Account } from './account.entity';
 import { Role } from 'src/roles/role.entity';
 

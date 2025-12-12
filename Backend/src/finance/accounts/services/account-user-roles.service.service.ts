@@ -12,18 +12,18 @@ import { AccountUserRole } from '../entity/account-user-role.entity';
 import { AssignRoleDto } from '../dto/assign-role.dto';
 import { UpdateRoleDto } from '../dto/update-role.dto';
 import { Role } from 'src/roles/role.entity';
-import { VerifyUserService } from 'src/auth/services/verify-user.service';
 import { AccountsService } from './accounts.service';
 import { RolesService } from 'src/roles/roles.service';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { Account } from '../entity/account.entity';
+import { UserValidator } from 'src/auth/validator/user.validator';
 
 @Injectable()
 export class AccountUserRolesService {
   constructor(
     @InjectRepository(AccountUserRole)
     private readonly roleRepo: Repository<AccountUserRole>,
-    private readonly verifyUserService: VerifyUserService,
+    private readonly userValidator: UserValidator,
     @Inject(forwardRef(() => AccountsService))
     private readonly accountsService: AccountsService,
     private readonly rolesService: RolesService,
@@ -94,7 +94,7 @@ export class AccountUserRolesService {
     }
 
     const role = await this.rolesService.findOne(dto.roleId);
-    const user = await this.verifyUserService.verify(dto.username);
+    const user = await this.userValidator.ensureUserExists(dto.username);
     const account = await this.accountsService.getAccount(accountId, owner);
 
     // Check if the user already has a role for this account
@@ -212,7 +212,7 @@ export class AccountUserRolesService {
 
   /** Get all accounts with their roles for a user */
   async getUserAccountsWithRoles(user: User): Promise<any[]> {
-    await this.verifyUserService.verify(user.id);
+    await this.userValidator.ensureUserExists(user.id);
 
     const roles = await this.roleRepo.find({
       where: { user: { id: user.id } },
@@ -287,7 +287,8 @@ export class AccountUserRolesService {
       await this.roleRepo.save(newOwnerRole);
     } else {
       // Assign owner role to user if not yet assigned
-      const newOwnerUser = await this.verifyUserService.verify(newOwnerId);
+      const newOwnerUser =
+        await this.userValidator.ensureUserExists(newOwnerId);
       const account = await this.accountsService.getAccount(
         accountId,
         currentOwner,

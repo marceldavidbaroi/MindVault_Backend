@@ -10,7 +10,7 @@ import { Repository } from 'typeorm';
 import { SavingsGoal } from '../entity/savings-goals.entity';
 import { CreateSavingsGoalDto } from '../dto/savings-goal-creation.dto';
 import { UpdateSavingsGoalDto } from '../dto/savings-goal-update.dto';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from 'src/auth/entity/user.entity';
 import { AccountsService } from 'src/finance/accounts/services/accounts.service';
 import { AccountUserRolesService } from 'src/finance/accounts/services/account-user-roles.service.service';
 

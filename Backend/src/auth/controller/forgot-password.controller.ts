@@ -33,28 +33,11 @@ export class ForgotPasswordController {
   @ApiResponse({
     status: 200,
     description: 'Security questions fetched successfully',
-    schema: {
-      example: {
-        success: true,
-        message: 'Security questions fetched successfully',
-        data: [
-          { id: 1, question: "What is your mother's maiden name?" },
-          { id: 2, question: 'What was your first pet’s name?' },
-        ],
-      },
-    },
   })
   async fetchQuestions(
     @Param('username') username: string,
-  ): Promise<ApiResponseType<{ id: number; question: string }[]>> {
-    const questions =
-      await this.forgotPasswordService.fetchForgotQuestions(username);
-
-    return {
-      success: true,
-      message: 'Security questions fetched successfully',
-      data: questions,
-    };
+  ): Promise<ApiResponseType<any>> {
+    return this.forgotPasswordService.fetchForgotQuestions(username);
   }
 
   // ------------------- VERIFY ANSWERS AND RESET PASSWORD -------------------
@@ -72,31 +55,18 @@ export class ForgotPasswordController {
   @ApiResponse({
     status: 200,
     description: 'Answers verified and password reset successfully',
-    schema: {
-      example: {
-        success: true,
-        message: 'Password reset successfully',
-        data: { newPasskey: 'generated-temp-password' },
-      },
-    },
   })
   async verifyAnswers(
     @Param('username') username: string,
     @Body() dto: VerifyForgotAnswersDto,
-  ): Promise<ApiResponseType<{ newPasskey: string }>> {
-    if (!dto.answers || !dto.answers.length)
+  ): Promise<ApiResponseType<any>> {
+    if (!dto.answers?.length)
       throw new BadRequestException('Answers are required');
 
-    const result = await this.forgotPasswordService.verifyForgotAnswers(
+    return this.forgotPasswordService.verifyForgotAnswers(
       username,
       dto.answers,
       dto.newPassword,
     );
-
-    return {
-      success: true,
-      message: result.message,
-      data: { newPasskey: result.newPasskey },
-    };
   }
 }

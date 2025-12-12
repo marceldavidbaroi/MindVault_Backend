@@ -1,77 +1,71 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { UserSecurityQuestion } from '../entities/userSecurityQuestion.entity';
-import { PasswordResetLog } from '../entities/passwordResetLog.entity';
 import { generatePasskey } from '../utils/passkey.util';
-import { VerifyUserService } from './verify-user.service';
-import { Repository } from 'typeorm';
-import { InjectRepository } from '@nestjs/typeorm';
-import { User } from '../entities/user.entity';
+import { ForgotPasswordValidator } from '../validator/forgot-password.validator';
+import { ForgotPasswordTransformer } from '../transformers/forgot-password.transformer';
+import { UserValidator } from '../validator/user.validator';
+import { UserSecurityQuestionRepository } from '../repository/user-security-question.repository';
+import { hashString } from 'src/common/utils/hash.util';
+import { UserRepository } from '../repository/user.repository';
+import { PasswordResetLogRepository } from '../repository/password-reset-log.repository';
 
 @Injectable()
 export class ForgotPasswordService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly verifyUserService: VerifyUserService,
-
-    @InjectRepository(UserSecurityQuestion)
-    private readonly questionsRepository: Repository<UserSecurityQuestion>,
-
-    @InjectRepository(PasswordResetLog)
-    private readonly resetLogRepository: Repository<PasswordResetLog>,
+    private readonly securityQuestionRepo: UserSecurityQuestionRepository,
+    private readonly validator: ForgotPasswordValidator,
+    private readonly transformer: ForgotPasswordTransformer,
+    private readonly userValidator: UserValidator,
+    private readonly userRepo: UserRepository,
+    private readonly passwordResetLogRepo: PasswordResetLogRepository,
   ) {}
 
-  // ------------------- FORGOT PASSWORD -------------------
-  async fetchForgotQuestions(
-    username: string,
-  ): Promise<{ id: number; question: string }[]> {
-    const user = await this.verifyUserService.verify(username);
+  // ------------------- FETCH QUESTIONS -------------------
+  async fetchForgotQuestions(username: string) {
+    const user = await this.userValidator.ensureUserExists(username);
 
-    const questions = await this.questionsRepository.find({
-      where: { user: { id: user.id } },
-    });
+    const questions = await this.securityQuestionRepo.findQuestionsByUserId(
+      user.id,
+    );
 
-    return questions.map((q) => ({ id: q.id, question: q.question }));
+    return {
+      success: true,
+      message: 'Security questions fetched successfully.',
+      data: this.transformer.questionsResponse(questions),
+    };
   }
 
+  // ------------------- VERIFY ANSWERS & RESET -------------------
   async verifyForgotAnswers(
     username: string,
     answers: { questionId: number; answer: string }[],
     newPassword: string,
-  ): Promise<{ message: string; newPasskey: string }> {
-    const user = await this.verifyUserService.verify(username);
+  ) {
+    const user = await this.userValidator.ensureUserExists(username);
+    const questions = await this.securityQuestionRepo.findQuestionsByUserId(
+      user.id,
+    );
 
-    const questions = await this.questionsRepository.find({
-      where: { user: { id: user.id } },
-    });
+    // Validate answers
+    await this.validator.validateAnswers(answers, questions);
 
-    for (const ans of answers) {
-      const q = questions.find((q) => q.id === ans.questionId);
-      if (!q) throw new BadRequestException('Invalid question ID');
-
-      const match = await bcrypt.compare(ans.answer, q.answerHash);
-      if (!match)
-        throw new BadRequestException('Incorrect answer for a question');
-    }
-
-    // ✅ All correct, reset password
-    user.password = await bcrypt.hash(newPassword, 10);
+    // Reset password
+    user.password = await hashString(newPassword);
     const newPasskey = generatePasskey();
     user.passkey = newPasskey;
     user.passkeyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     user.refreshToken = undefined;
 
-    await this.userRepository.save(user); // or user.save() if using ActiveRecord
+    await this.userRepo.saveUser(user);
 
     // Log reset
-    const resetLog = this.resetLogRepository.create({
+    const log = this.passwordResetLogRepo.createResetLog({
       user,
       method: 'security_questions',
       success: true,
     });
-    await this.resetLogRepository.save(resetLog);
+    await this.passwordResetLogRepo.saveResetLog(log);
 
-    return { message: 'Password reset successful', newPasskey };
+    return { success: true, message: 'Password reset successful', newPasskey };
   }
 }

@@ -12,8 +12,7 @@ import {
 } from '../entities/transaction.entity';
 import { CreateTransactionDto } from '../dto/create-transaction.dto';
 import { UpdateTransactionDto } from '../dto/update-transaction.dto';
-import { User } from 'src/auth/entities/user.entity';
-import { VerifyUserService } from 'src/auth/services/verify-user.service';
+import { User } from 'src/auth/entity/user.entity';
 import { CurrencyService } from 'src/finance/currency/services/currency.service';
 import { CategoriesService } from 'src/finance/categories/categories.service';
 import { AccountsService } from 'src/finance/accounts/services/accounts.service';
@@ -25,13 +24,14 @@ import { safeAdd, safeSubtract } from 'src/common/utils/decimal-balance';
 import { BulkCreateTransactionDto } from '../dto/bulk-create-transaction.dto';
 import { MonthlySummary } from 'src/finance/summary/entity/monthly-summary.entity';
 import { YearlySummary } from 'src/finance/summary/entity/yearly-summary.entity';
+import { UserValidator } from 'src/auth/validator/user.validator';
 
 @Injectable()
 export class TransactionService {
   constructor(
     @InjectRepository(Transaction)
     private readonly transactionRepo: Repository<Transaction>,
-    private readonly verifyUserService: VerifyUserService,
+    private readonly userValidator: UserValidator,
     private readonly currencyService: CurrencyService,
     private readonly categoryService: CategoriesService,
     private readonly dataSource: DataSource,
@@ -61,7 +61,7 @@ export class TransactionService {
 
   async createTransaction(userId: number, dto: CreateTransactionDto) {
     return await this.dataSource.transaction(async (manager) => {
-      const user: User = await this.verifyUserService.verify(userId);
+      const user: User = await this.userValidator.ensureUserExists(userId);
       await this.verifyAccountPermission(userId, dto.accountId);
 
       const account = await this.accountUserRolesService.getUserRoleForAccount(
@@ -145,7 +145,7 @@ export class TransactionService {
     dto: BulkCreateTransactionDto,
   ) {
     return await this.dataSource.transaction(async (manager) => {
-      const user: User = await this.verifyUserService.verify(userId);
+      const user: User = await this.userValidator.ensureUserExists(userId);
       const account = await this.accountUserRolesService.getUserRoleForAccount(
         userId,
         dto.accountId,

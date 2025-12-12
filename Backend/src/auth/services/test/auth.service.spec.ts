@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '../auth.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { User } from '../../entities/user.entity';
-import { UserPreferences } from '../../entities/userPreferences.entity';
-import { UserSession } from '../../entities/userSessions.entity';
+import { User } from '../../entity/user.entity';
+import { UserPreferences } from '../../entity/userPreferences.entity';
+import { UserSession } from '../../entity/userSessions.entity';
 import { JwtService } from '@nestjs/jwt';
 import { VerifyUserService } from '../verify-user.service';
 import { authCredentialsDto } from '../../dto/auth-credentials.dto';

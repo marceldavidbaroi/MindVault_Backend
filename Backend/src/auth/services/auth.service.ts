@@ -41,8 +41,8 @@ export class AuthService {
     const { username, password } = dto;
 
     // check if username exists
-    const existingUser = await this.userValidator.ensureUserExists(username);
-    if (existingUser) throw new ConflictException('Username already exists');
+    const existingUser =
+      await this.userValidator.ensureUsernameNotTaken(username);
 
     const hashedPassword = await hashString(password);
     const passkey = generatePasskey();
@@ -81,7 +81,7 @@ export class AuthService {
 
     // get user using validator
     const user = await this.userValidator
-      .ensureUserExists(username)
+      .ensureUserExistsForLogin(username)
       .catch(() => {
         throw new BadRequestException('Invalid username or password');
       });

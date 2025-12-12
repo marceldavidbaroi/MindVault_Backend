@@ -44,4 +44,16 @@ export class UserRepository {
 
     return this.repo.findOne({ where }); // return full entity
   }
+
+  findUserByIdOrUsernameWithPassword(idOrUsername: number | string) {
+    const where =
+      typeof idOrUsername === 'number'
+        ? { id: idOrUsername }
+        : { username: idOrUsername };
+
+    return this.repo.findOne({
+      where,
+      select: ['id', 'username', 'email', 'password'], // 👈 ADD PASSWORD HERE
+    });
+  }
 }

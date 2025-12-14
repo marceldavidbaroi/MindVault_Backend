@@ -7,9 +7,10 @@ import { RolesSeeder } from './seeder/roles.seeder';
 import { RolesTransformer } from './transformers/roles.transformer';
 import { RolesValidator } from './validators/roles.validator';
 import { RolesRepository } from './repository/roles.repository';
+import { CommandModule } from 'nestjs-command';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Role])],
+  imports: [TypeOrmModule.forFeature([Role]), CommandModule],
   providers: [
     RolesSeeder,
     RolesService,

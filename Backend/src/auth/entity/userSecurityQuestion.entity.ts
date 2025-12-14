@@ -15,6 +15,9 @@ export class UserSecurityQuestion extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ name: 'user_id', nullable: true })
+  userId: number;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;

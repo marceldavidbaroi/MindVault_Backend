@@ -12,10 +12,6 @@ import { UserPreferences } from './userPreferences.entity';
 import { UserSecurityQuestion } from './userSecurityQuestion.entity';
 import { PasswordResetLog } from './passwordResetLog.entity';
 import { UserSession } from './userSessions.entity';
-import { Category } from 'src/finance/categories/categories.entity';
-import { Account } from 'src/finance/accounts/entity/account.entity';
-import { AccountUserRole } from 'src/finance/accounts/entity/account-user-role.entity';
-import { Transaction } from 'src/finance/transactions/entities/transaction.entity';
 
 @Entity()
 export class User extends BaseEntity {
@@ -70,28 +66,6 @@ export class User extends BaseEntity {
   })
   updatedAt: Date;
 
-  // relations
-
-  @OneToMany(() => UserSecurityQuestion, (q) => q.user)
-  securityQuestions: UserSecurityQuestion[];
-
-  @OneToMany(() => PasswordResetLog, (log) => log.user)
-  passwordResetLogs: PasswordResetLog[];
-
-  @OneToMany(() => UserSession, (session) => session.user)
-  sessions: UserSession[];
-
   @OneToOne(() => UserPreferences, (pref) => pref.user, { cascade: true })
   preferences: UserPreferences;
-
-  @OneToMany(() => Category, (category) => category.user)
-  categories: Category[];
-  @OneToMany(() => Account, (account) => account.owner)
-  accounts: Account[];
-
-  @OneToMany(() => AccountUserRole, (accountRole) => accountRole.user)
-  accountRoles: AccountUserRole[];
-
-  @OneToMany(() => Transaction, (transaction) => transaction.creatorUser)
-  transactions: Transaction[];
 }

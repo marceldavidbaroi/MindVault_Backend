@@ -34,9 +34,13 @@ export class ProfileService {
   async getProfile(user: User) {
     const currentUser =
       await this.userValidator.ensureUserExistsWithPreferences(user.id);
+
     const safeUser = this.authTransformer.safeUser(currentUser);
+
+    const preferencesEntity =
+      await this.userPreferencesRepo.findPreferencesByUserId(currentUser.id);
     const preferences = this.profileTransformer.formatPreferences(
-      currentUser.preferences,
+      preferencesEntity ?? undefined,
     );
 
     return {
@@ -69,10 +73,12 @@ export class ProfileService {
       backend?: BackendPreferences;
     },
   ) {
-    const currentUser =
-      await this.userValidator.ensureUserExistsWithPreferences(user.id);
+    const currentUser = await this.userValidator.ensureUserExists(user.id);
 
-    let preferences = currentUser.preferences;
+    // Always fetch the latest preferences from the repo
+    let preferences = await this.userPreferencesRepo.findPreferencesByUserId(
+      currentUser.id,
+    );
 
     if (!preferences) {
       preferences = this.userPreferencesRepo.createPreferences({
@@ -82,9 +88,11 @@ export class ProfileService {
       });
     }
 
+    // Merge updates
     preferences.frontend = { ...preferences.frontend, ...updateData.frontend };
     preferences.backend = { ...preferences.backend, ...updateData.backend };
 
+    // Save updated preferences
     await this.userPreferencesRepo.savePreferences(preferences);
 
     return {

@@ -20,6 +20,6 @@ import { CommandModule } from 'nestjs-command';
     RolesRepository,
   ],
   controllers: [RolesController],
-  exports: [RolesService],
+  exports: [RolesService, RolesValidator],
 })
 export class RolesModule {}

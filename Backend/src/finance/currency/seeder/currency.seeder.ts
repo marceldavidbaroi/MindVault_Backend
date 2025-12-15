@@ -1,30 +1,24 @@
-// src/finance/currency/currency.seeder.ts
+// src/finance/currency/seeder/currency.seeder.ts
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
 import { Command } from 'nestjs-command';
-import { Currency } from '../entity/currency.entity';
+import { CurrencyRepository } from '../repository/currency.repository';
 import { defaultCurrencies } from '../data/currency.data';
 
 @Injectable()
 export class CurrencySeeder {
-  constructor(
-    private readonly dataSource: DataSource,
-    @InjectRepository(Currency)
-    private readonly currencyRepo: Repository<Currency>,
-  ) {}
+  constructor(private readonly currencyRepo: CurrencyRepository) {}
 
   @Command({
     command: 'currency:seed',
     describe: 'Seed default currencies',
   })
   async seed() {
-    // Clear table and dependent tables
-    await this.dataSource.query(`TRUNCATE TABLE currencies CASCADE;`);
+    console.log('🧹 Truncating currencies table...');
+    await this.currencyRepo.truncate();
 
-    // Save default currencies
-    await this.currencyRepo.save(defaultCurrencies);
+    console.log('📥 Seeding default currencies...');
+    await this.currencyRepo.saveMany(defaultCurrencies);
 
-    console.log('✅ Default currencies seeded!');
+    console.log('✅ Default currencies seeded successfully!');
   }
 }

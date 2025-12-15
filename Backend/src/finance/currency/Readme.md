@@ -1,119 +1,70 @@
-Here’s a **Markdown README** for your **Finance Currencies module**, structured for clarity and developer reference:
-
-````markdown
 # Finance Currencies Module
 
-This module manages **currencies and exchange rates** in the finance system. It supports **listing, verifying, creating, updating, and seeding currencies**, as well as **managing exchange rates between currencies**.
+## Overview
+
+The **Finance Currencies Module** manages supported currencies in the system.  
+It provides a **read-only API** for listing currencies and a **shared validator** that other modules can use to **verify currency codes safely and consistently**.
+
+This module does **not** handle currency exchange rates, conversions, or filtering logic.
 
 All endpoints are documented with **Swagger**.
 
 ---
 
-## Table of Contents
+## Endpoints
 
-- [Entities](#entities)
-- [DTOs](#dtos)
-- [Controllers & Endpoints](#controllers--endpoints)
-- [Services](#services)
-- [Seeder](#seeder)
-- [Notes](#notes)
+| Method | Route               | Description                   | Auth Required | Roles / Permissions |
+| -----: | ------------------- | ----------------------------- | ------------- | ------------------- |
+|    GET | /finance/currencies | List all supported currencies | ✅            | authenticated user  |
 
----
-
-## Entities
-
-### Currency
-
-Represents a supported currency.
-
-| Field        | Type           | Description                       |
-| ------------ | -------------- | --------------------------------- |
-| code         | string         | ISO 4217 currency code (Primary)  |
-| name         | string         | Currency name                     |
-| symbol       | string         | Currency symbol                   |
-| decimal      | number         | Number of decimal places          |
-| isActive     | boolean        | Whether the currency is active    |
-| createdAt    | Date           | Creation timestamp                |
-| updatedAt    | Date           | Last updated timestamp            |
-| fromRates    | ExchangeRate[] | Exchange rates from this currency |
-| toRates      | ExchangeRate[] | Exchange rates to this currency   |
-| transactions | Transaction[]  | Transactions using this currency  |
-| accounts     | Account[]      | Accounts using this currency      |
-
----
-
-### ExchangeRate
-
-Represents the conversion rate between two currencies on a specific date.
-
-| Field        | Type     | Description                   |
-| ------------ | -------- | ----------------------------- |
-| id           | number   | Primary key                   |
-| fromCurrency | Currency | Source currency               |
-| toCurrency   | Currency | Target currency               |
-| rate         | number   | Exchange rate value           |
-| date         | string   | Date of the rate (YYYY-MM-DD) |
-| createdAt    | Date     | Timestamp of creation         |
-
-**Indexes & Constraints:**
-
-- `@Index(['fromCurrency', 'toCurrency', 'date'], { unique: true })` ensures unique rates per currency pair per date.
-
----
-
-## DTOs
-
-### CreateCurrencyDto
-
-| Field     | Type    | Description                            |
-| --------- | ------- | -------------------------------------- |
-| code      | string  | Currency code (ISO 4217)               |
-| name      | string  | Currency name                          |
-| symbol    | string  | Currency symbol                        |
-| decimal?  | number  | Optional decimals (default: 2)         |
-| isActive? | boolean | Optional active status (default: true) |
-
-### UpdateCurrencyDto
-
-- Partial type of `CreateCurrencyDto` for updating currency information.
-
-### CreateExchangeRateDto
-
-| Field | Type   | Description                   |
-| ----- | ------ | ----------------------------- |
-| from  | string | Source currency code          |
-| to    | string | Target currency code          |
-| rate  | number | Exchange rate value           |
-| date  | string | Date of the rate (YYYY-MM-DD) |
-
-### FilterExchangeRateDto
-
-| Field | Type   | Description             |
-| ----- | ------ | ----------------------- |
-| from  | string | Source currency code    |
-| to    | string | Target currency code    |
-| date? | string | Optional filter by date |
-
----
-
-## Controllers & Endpoints
-
-All endpoints are under `/finance/currencies`.
-
-| Method | Endpoint              | Description                   | Auth Required |
-| ------ | --------------------- | ----------------------------- | ------------- |
-| GET    | `/finance/currencies` | List all supported currencies | ✅            |
-
-> Returns:
+### Response Format
 
 ```ts
 {
-  success: boolean,
-  message: string,
-  data: Currency[]
+  success: boolean;
+  message: string;
+  data: Currency[];
 }
 ```
-````
+
+---
+
+## Business Logic / Rules
+
+- Only **active currencies** are considered valid.
+- Currency codes must exist and be active to pass validation.
+- No creation, update, or deletion endpoints are exposed.
+- No filtering or search parameters are supported.
+- Currency verification logic is centralized in a **shared validator**.
+- Other modules **must not query the currency table directly**.
+
+---
+
+## Entities / Relationships
+
+### Currency
+
+Represents a supported currency in the system.
+
+| Field     | Type    | Description                      |
+| --------- | ------- | -------------------------------- |
+| code      | string  | ISO 4217 currency code (Primary) |
+| name      | string  | Currency name                    |
+| symbol    | string  | Currency symbol                  |
+| decimal   | number  | Number of decimal places         |
+| isActive  | boolean | Whether the currency is active   |
+| createdAt | Date    | Creation timestamp               |
+| updatedAt | Date    | Last updated timestamp           |
+
+> The `code` field is the primary identifier and is immutable.
+
+---
+
+## DTOs (Data Transfer Objects)
+
+This module does **not** expose DTOs for mutation operations.
+
+All currency data is returned using the `Currency` entity shape.
 
 ---
 
@@ -121,13 +72,49 @@ All endpoints are under `/finance/currencies`.
 
 ### CurrencyService
 
-- `listCurrencies()` – Lists all active currencies (code, name, symbol, decimal, isActive).
-- `verifyCurrency(code)` – Validates a currency code exists, throws `BadRequestException` if invalid.
+Handles read-only operations related to currencies.
 
-### ExchangeRateService
+#### Methods
 
-- `updateRate(dto)` – Creates or updates an exchange rate for a currency pair on a specific date.
-- `getRate(filters)` – Retrieves exchange rates filtered by `from`, `to`, and optional `date`.
+- `listCurrencies()`
+  - Returns all currencies
+  - Excludes internal timestamps where needed
+  - Used only by the HTTP controller
+
+---
+
+## Validators
+
+### CurrencyValidator
+
+A **shared domain validator** used across modules to validate currency codes.
+
+#### Purpose
+
+- Ensures a currency exists
+- Ensures the currency is active
+- Centralizes currency validation logic
+- Prevents duplication and inconsistent checks
+
+#### Method
+
+```ts
+ensureCurrencyExists(code: string): Promise<Currency>
+```
+
+#### Behavior
+
+- Throws `BadRequestException` if:
+  - Currency does not exist
+  - Currency is inactive
+
+#### Usage Example (Other Modules)
+
+```ts
+await this.currencyValidator.ensureCurrencyExists(dto.currencyCode);
+```
+
+✅ This validator is **exported** and intended for cross-module usage.
 
 ---
 
@@ -135,18 +122,56 @@ All endpoints are under `/finance/currencies`.
 
 ### CurrencySeeder
 
-Seeds **default currencies** into the database.
+Seeds default currencies into the database.
 
-**Command:**
+#### Command
 
 ```bash
 npm run command currency:seed
 ```
 
-**Behavior:**
+#### Behavior
 
-- Truncates the `currencies` table and cascades dependent tables.
-- Inserts all `defaultCurrencies`.
-- Logs success after seeding.
+- Truncates the `currencies` table
+- Inserts predefined default currencies
+- Logs execution status
+
+> Seeders are CLI-only and are **not exposed** to HTTP or other modules.
 
 ---
+
+## Standard Response Format
+
+All endpoints return responses in the following format:
+
+```ts
+{
+  success: boolean;
+  message: string;
+  data: any;
+}
+```
+
+---
+
+## Design Notes
+
+- Currency mutation is intentionally restricted.
+- Exchange rates and conversions belong to a **separate finance module**.
+- Validators are preferred over services for cross-module dependencies.
+- This module follows **strict separation of concerns**:
+  - Controller → Service → Repository
+  - Validator for shared rules
+  - Seeder for CLI-only logic
+
+---
+
+## Summary
+
+- ✅ Read-only currency access
+- ✅ Centralized validation
+- ✅ Clean module boundaries
+- ✅ Safe cross-module usage
+- ✅ No exchange-rate complexity
+
+This module acts as a **source of truth for supported currencies** in the system.

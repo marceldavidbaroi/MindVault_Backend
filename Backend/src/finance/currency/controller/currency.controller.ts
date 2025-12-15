@@ -11,9 +11,7 @@ export class CurrencyController {
 
   @Get()
   @ApiOperation({ summary: 'List all supported currencies' })
-  // The ApiResponse decorator reflects the inner data type for documentation purposes.
-  async list(): Promise<ApiResponse<Currency[]>> {
-    // FIX: Added 'await' to resolve the Promise returned by listCurrencies()
+  async list(): Promise<ApiResponse<Partial<Currency>[]>> {
     const currencies = await this.currencyService.listCurrencies();
 
     return {

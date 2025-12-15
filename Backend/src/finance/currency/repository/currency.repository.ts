@@ -10,6 +10,17 @@ export class CurrencyRepository {
     private readonly repo: Repository<Currency>,
   ) {}
 
+  async truncate() {
+    await this.repo.query(
+      'TRUNCATE TABLE currencies RESTART IDENTITY CASCADE;',
+    );
+  }
+
+  async saveMany(data: Partial<Currency>[]) {
+    const entities = this.repo.create(data);
+    return this.repo.save(entities);
+  }
+
   findAllPublic() {
     return this.repo.find({
       select: ['code', 'name', 'symbol', 'decimal', 'isActive'],

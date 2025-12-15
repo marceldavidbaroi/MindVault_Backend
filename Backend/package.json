@@ -24,7 +24,8 @@
     "migration:revert": "typeorm-ts-node-esm migration:revert -d ./src/config/typeorm.datasource.ts",
     "seed:roles": "ts-node -r tsconfig-paths/register src/main.ts roles:seed",
     "seed:tags_group": "ts-node -r tsconfig-paths/register src/main.ts tag-group:seed",
-    "seed:tags": "ts-node -r tsconfig-paths/register src/main.ts tag:seed"
+    "seed:tags": "ts-node -r tsconfig-paths/register src/main.ts tag:seed",
+    "seed:currencies": "ts-node -r tsconfig-paths/register src/main.ts currency:seed"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

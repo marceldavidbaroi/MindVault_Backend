@@ -7,10 +7,16 @@ import { AuthModule } from './auth/auth.module';
 
 import * as dotenv from 'dotenv';
 import { RolesModule } from './roles/roles.module';
+import { TagsModule } from './tags/tags.module';
 dotenv.config();
 
 @Module({
-  imports: [TypeOrmModule.forRoot(typeOrmConfig), AuthModule, RolesModule],
+  imports: [
+    TypeOrmModule.forRoot(typeOrmConfig),
+    AuthModule,
+    RolesModule,
+    TagsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

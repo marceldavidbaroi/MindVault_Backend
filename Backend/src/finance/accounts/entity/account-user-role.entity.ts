@@ -57,8 +57,4 @@ export class AccountUserRole {
 
   @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
   updatedAt: Date;
-
-  constructor(partial: Partial<AccountUserRole>) {
-    Object.assign(this, partial);
-  }
 }

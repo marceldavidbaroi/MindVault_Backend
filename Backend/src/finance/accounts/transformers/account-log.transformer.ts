@@ -1,0 +1,27 @@
+import { AccountLog } from '../entity/account-log.entity';
+
+export class AccountLogTransformer {
+  static toResponse(log: AccountLog) {
+    return {
+      id: log.id,
+      accountId: log.accountId,
+      userId: log.userId,
+      action: log.action,
+      oldValue: log.oldValue,
+      newValue: log.newValue,
+      transactionId: log.transactionId,
+      source: log.source,
+      createdAt: log.createdAt,
+      account: log.account
+        ? { id: log.account.id, name: log.account.name }
+        : undefined,
+      user: log.user
+        ? { id: log.user.id, username: log.user.username }
+        : undefined,
+    };
+  }
+
+  static toResponseList(logs: AccountLog[]) {
+    return logs.map(this.toResponse);
+  }
+}

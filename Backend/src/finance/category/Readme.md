@@ -1,94 +1,83 @@
-Here’s a **Markdown README** for your **Finance Categories module**, structured for clarity and developer reference:
+# Categories Module
 
-````markdown
-# Finance Categories Module
+## Overview
 
-This module manages **income and expense categories** for a finance system. It supports **system-wide, business, family, and individual categories**, along with **CRUD operations, filtering, and statistics**.
-
-All endpoints require **JWT authentication**.
+The `Categories` module handles all operations related to **finance categories** for accounts, including creation, updating, deletion, fetching, and listing.
+It supports **system-level categories** (global, business, family) and **user-specific categories**, with role- and scope-based access control.
 
 ---
 
-## Table of Contents
+## Endpoints
 
-- [Entities](#entities)
-- [DTOs](#dtos)
-- [Controllers & Endpoints](#controllers--endpoints)
-- [Services](#services)
-- [Seeder](#seeder)
-- [Category Stats](#category-stats)
-- [Permissions & Scope](#permissions--scope)
-
----
-
-## Entities
-
-### Category
-
-Represents a financial category.
-
-| Field                  | Type                                               | Description                                    |
-| ---------------------- | -------------------------------------------------- | ---------------------------------------------- |
-| id                     | number                                             | Unique identifier                              |
-| user?                  | User                                               | Optional owner; only for individual categories |
-| name                   | string                                             | Category name                                  |
-| displayName?           | string                                             | Optional display name                          |
-| type                   | `income` \| `expense`                              | Type of category                               |
-| scope                  | `global` \| `business` \| `family` \| `individual` | Category scope                                 |
-| createdAt              | Date                                               | Timestamp of creation                          |
-| updatedAt              | Date                                               | Timestamp of last update                       |
-| transactions           | Transaction[]                                      | Related transactions                           |
-| monthlyCategorySummary | MonthlyCategorySummary[]                           | Monthly category summaries                     |
-| dailyCategorySummaries | DailyCategorySummary[]                             | Daily category summaries                       |
-
-**Indexes & Constraints:**
-
-- `@Index(['user', 'name', 'scope'], { unique: true })` ensures a unique name per user and scope.
+| Method | Route                         | Description                                | Auth Required | Roles / Permissions |
+| ------ | ----------------------------- | ------------------------------------------ | ------------- | ------------------- |
+| GET    | /finance/categories           | List categories (filterable by type/scope) | ✅            | user/admin          |
+| GET    | /finance/categories/:id       | Get a single category by ID                | ✅            | user/admin          |
+| POST   | /finance/categories           | Create a new category                      | ✅            | user/admin          |
+| PATCH  | /finance/categories/:id       | Update an existing category                | ✅            | user/admin          |
+| DELETE | /finance/categories/:id       | Delete a category                          | ✅            | user/admin          |
+| GET    | /finance/categories/stats/all | Get category statistics/status             | ✅            | user/admin          |
 
 ---
 
-## DTOs
+## Business Logic / Rules
 
-### CreateCategoryDto
+- **Validation Rules**
+  - Category names must be unique per user and scope.
+  - Only user-specific categories can be updated or deleted.
+  - System categories (`GLOBAL`, `BUSINESS`, `FAMILY`) cannot be modified.
 
-| Field        | Type   | Description                           |
-| ------------ | ------ | ------------------------------------- |
-| name         | string | Category name                         |
-| displayName? | string | Optional display name                 |
-| type?        | string | Optional type (`income` or `expense`) |
+- **Access Control**
+  - Individual categories are readable and writable only by the owning user.
+  - System categories are read-only for all users.
 
-### UpdateCategoryDto
+- **Special Workflows**
+  - Category statistics endpoint aggregates counts by type and owner (system/user).
+  - Duplicate name checks prevent conflicting category creation.
 
-| Field        | Type   | Description                   |
-| ------------ | ------ | ----------------------------- |
-| name?        | string | Optional updated name         |
-| displayName? | string | Optional updated display name |
-| type?        | string | Optional updated type         |
-
-### FilterCategoryDto
-
-| Field   | Type                                               | Description                   |
-| ------- | -------------------------------------------------- | ----------------------------- |
-| type?   | `income` \| `expense`                              | Filter categories by type     |
-| search? | string                                             | Search by name or displayName |
-| scope?  | `global` \| `business` \| `family` \| `individual` | Filter by scope               |
+- **Edge Cases**
+  - Attempting to modify or delete a system category throws a `BadRequestException`.
+  - Accessing a category without permission throws a `BadRequestException`.
+  - Missing category results in a `NotFoundException`.
 
 ---
 
-## Controllers & Endpoints
+## Entities / Relationships
 
-All endpoints are under `/finance/categories`.
+| Entity   | Relation Type | Notes                                                |
+| -------- | ------------- | ---------------------------------------------------- |
+| Category | ManyToOne     | Optional relation to `User` (user-specific category) |
 
-| Method | Endpoint     | Description                         | Auth Required |
-| ------ | ------------ | ----------------------------------- | ------------- |
-| POST   | `/`          | Create a new category               | ✅            |
-| PATCH  | `/:id`       | Update a category                   | ✅            |
-| DELETE | `/:id`       | Delete a category                   | ✅            |
-| GET    | `/:id`       | Get a single category               | ✅            |
-| GET    | `/`          | List all categories (system + user) | ✅            |
-| GET    | `/stats/all` | Get category statistics             | ✅            |
+**Category Fields**
 
-**Responses:** All endpoints return:
+| Field       | Type                                           | Notes                                  |
+| ----------- | ---------------------------------------------- | -------------------------------------- |
+| id          | number                                         | Primary key                            |
+| userId      | number (nullable)                              | FK to User, null for system categories |
+| user        | User (nullable)                                | Many-to-one relation to User           |
+| name        | string                                         | Category name (unique per user/scope)  |
+| displayName | string (nullable)                              | Optional display name                  |
+| type        | enum (INCOME / EXPENSE)                        | Category type                          |
+| scope       | enum (GLOBAL / BUSINESS / FAMILY / INDIVIDUAL) | Scope of category                      |
+| createdAt   | timestamp                                      | Created timestamp                      |
+| updatedAt   | timestamp                                      | Last updated timestamp                 |
+
+---
+
+## DTOs (Data Transfer Objects)
+
+| DTO Name          | Purpose                                   |
+| ----------------- | ----------------------------------------- |
+| CreateCategoryDto | Data for creating a new category          |
+| UpdateCategoryDto | Data for updating an existing category    |
+| FilterCategoryDto | Optional filters for listing categories   |
+| CategoryStatsDto  | Structure of category statistics response |
+
+---
+
+## Standard Response Format
+
+All endpoints return:
 
 ```ts
 {
@@ -97,72 +86,10 @@ All endpoints are under `/finance/categories`.
   data: any
 }
 ```
-````
 
 ---
 
-## Services
+## Notes
 
-### CategoriesService
-
-- `createCategory(user, dto)` – Creates a new individual category.
-- `updateCategory(id, dto, user)` – Updates an individual category.
-- `deleteCategory(id, user)` – Deletes an individual category.
-- `getCategory(id, user)` – Fetches a single category.
-- `listCategories(user, type?, search?, scope?)` – Lists categories including system-wide + user-specific.
-- `verifyCategory(id)` – Ensures the category exists.
-- `getCategoryStats(user)` – Returns counts for income/expense categories by system/user.
-
----
-
-## Seeder
-
-### CategoriesSeeder
-
-Seeds **default categories** into the database.
-
-**Command:**
-
-```bash
-npm run command categories:run
-```
-
-**Behavior:**
-
-- Truncates the `categories` table
-- Inserts all `defaultCategories`
-- Logs success/failure
-
----
-
-## Category Stats
-
-`CategoryStats` interface provides:
-
-```ts
-interface CategoryStats {
-  total: number;
-  income: { total: number; system: number; user: number };
-  expense: { total: number; system: number; user: number };
-}
-```
-
-- `total`: total categories
-- `income`: income category count (system vs user)
-- `expense`: expense category count (system vs user)
-
----
-
-## Permissions & Scope
-
-| Scope      | Permissions                                         |
-| ---------- | --------------------------------------------------- |
-| GLOBAL     | System category, cannot update or delete            |
-| BUSINESS   | Business category, cannot update or delete          |
-| FAMILY     | Shared among family, limited updates by owner/admin |
-| INDIVIDUAL | Created by user, full CRUD for owner only           |
-
-- Users **cannot modify system categories**.
-- Only owners can update/delete individual categories.
-
----
+- The **CategoryValidator** is exposed so other modules can **validate categories** before using them.
+- Categories can be **seeded** with default system data via the `categories:seed` command.

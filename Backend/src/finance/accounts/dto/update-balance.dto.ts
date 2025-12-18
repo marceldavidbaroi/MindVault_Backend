@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsEnum, ApiProperty } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsEnum } from 'class-validator';
 
 export enum BalanceAction {
   ADD = 'ADD',

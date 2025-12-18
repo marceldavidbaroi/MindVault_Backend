@@ -18,6 +18,12 @@ import { AccountLog } from './entity/account-log.entity';
 
 import { AccountTypeSeeder } from './seeder/account-type.seeder';
 
+// ✅ repositories
+import { AccountRepository } from './repository/account.repository';
+import { AccountTypeRepository } from './repository/account-type.repository';
+import { AccountUserRoleRepository } from './repository/account-user-role.repository';
+import { AccountLogRepository } from './repository/account-log.repository';
+
 import { RolesModule } from 'src/roles/roles.module';
 import { AuthModule } from 'src/auth/auth.module';
 import { CurrencyModule } from '../currency/currency.module';
@@ -46,11 +52,21 @@ import { AccountLogValidator } from './validators/account-log.validator';
     AccountLogController,
   ],
   providers: [
+    // ✅ repositories (THIS WAS MISSING)
+    AccountRepository,
+    AccountTypeRepository,
+    AccountUserRoleRepository,
+    AccountLogRepository,
+
+    // seeders
     AccountTypeSeeder,
+
+    // services
     AccountsService,
     AccountTypesService,
     AccountUserRolesService,
     AccountLogService,
+
     // validators
     AccountValidator,
     AccountTypeValidator,
@@ -58,11 +74,19 @@ import { AccountLogValidator } from './validators/account-log.validator';
     AccountLogValidator,
   ],
   exports: [
+    // services
     AccountsService,
     AccountTypesService,
     AccountUserRolesService,
     AccountLogService,
-    // export validators
+
+    // repositories (export if used elsewhere)
+    AccountRepository,
+    AccountTypeRepository,
+    AccountUserRoleRepository,
+    AccountLogRepository,
+
+    // validators
     AccountValidator,
     AccountTypeValidator,
     AccountUserRoleValidator,

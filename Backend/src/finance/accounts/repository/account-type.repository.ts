@@ -7,10 +7,18 @@ export class AccountTypeRepository extends Repository<AccountType> {
   constructor(private readonly dataSource: DataSource) {
     super(AccountType, dataSource.createEntityManager());
   }
+
+  async truncate(): Promise<void> {
+    await this.dataSource.query(
+      `TRUNCATE TABLE account_types RESTART IDENTITY CASCADE;`,
+    );
+  }
+
   async saveMany(data: Partial<AccountType>[]): Promise<AccountType[]> {
     const entities = this.create(data);
     return this.save(entities);
   }
+
   async findActive(): Promise<AccountType[]> {
     return this.find({
       select: ['id', 'name', 'description', 'isActive', 'scope'],

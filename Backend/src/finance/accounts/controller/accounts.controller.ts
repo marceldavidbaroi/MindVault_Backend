@@ -83,28 +83,4 @@ export class AccountsController {
   async get(@Param('id', ParseIntPipe) id: number) {
     return this.accountsService.getById(id);
   }
-
-  @Get(':id/balance')
-  @ApiOperation({ summary: 'Get account balance' })
-  @SwaggerResponse({
-    status: 200,
-    description: 'Account balance fetched successfully.',
-  })
-  async getBalance(@Param('id', ParseIntPipe) id: number) {
-    return this.accountsService.getBalance(id);
-  }
-
-  @Patch(':id/balance')
-  @ApiOperation({ summary: 'Update account balance' })
-  @SwaggerResponse({
-    status: 200,
-    description: 'Account balance updated successfully.',
-  })
-  async updateBalance(
-    @Param('id', ParseIntPipe) id: number,
-    @GetUser() user: User,
-    @Body() dto: UpdateBalanceDto,
-  ) {
-    return this.accountsService.updateBalance(id, user, dto);
-  }
 }

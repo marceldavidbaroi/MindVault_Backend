@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  forwardRef,
+  Inject,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AccountRepository } from '../repository/account.repository';
 import { Account } from '../entity/account.entity';
@@ -27,6 +32,7 @@ export class AccountsService {
     private readonly accountValidator: AccountValidator,
     private readonly currencyValidator: CurrencyValidator,
     private readonly accountTypeValidator: AccountTypeValidator,
+    @Inject(forwardRef(() => AccountUserRolesService))
     private readonly accountUserRolesService: AccountUserRolesService,
     private readonly accountLogService: AccountLogService,
     private readonly accountUserRoleValidator: AccountUserRoleValidator,

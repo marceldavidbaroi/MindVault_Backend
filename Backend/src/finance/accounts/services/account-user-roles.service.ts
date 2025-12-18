@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { AccountUserRoleRepository } from '../repository/account-user-role.repository';
 import { AssignRoleDto } from '../dto/assign-role.dto';
 import { UpdateRoleDto } from '../dto/update-role.dto';
@@ -21,6 +21,7 @@ export class AccountUserRolesService {
     private readonly userValidator: UserValidator,
     private readonly accountValidator: AccountValidator,
     private readonly accountUserRoleValidator: AccountUserRoleValidator,
+    @Inject(forwardRef(() => AccountsService))
     private readonly accountsService: AccountsService,
     private readonly accountLogService: AccountLogService, // <- make sure you have this injected
   ) {}

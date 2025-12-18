@@ -2,79 +2,109 @@ import {
   Controller,
   Get,
   Post,
-  Put,
+  Patch,
   Delete,
   Param,
-  Query,
   Body,
+  Query,
+  UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse as SwaggerResponse,
+} from '@nestjs/swagger';
+import { GetUser } from 'src/auth/get-user.decorator';
+import { User } from 'src/auth/entity/user.entity';
 import { AccountsService } from '../services/accounts.service';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
 import { FilterAccountDto } from '../dto/filter-account.dto';
 import { UpdateBalanceDto } from '../dto/update-balance.dto';
-import { User } from 'src/auth/entity/user.entity';
-import { GetUser } from 'src/auth/get-user.decorator';
 
 @ApiTags('Accounts')
-@Controller('finance/accounts')
+@UseGuards(AuthGuard('jwt'))
+@Controller('accounts')
 export class AccountsController {
-  constructor(private readonly service: AccountsService) {}
+  constructor(private readonly accountsService: AccountsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new account' })
+  @SwaggerResponse({
+    status: 201,
+    description: 'Account created successfully.',
+  })
   async create(@GetUser() user: User, @Body() dto: CreateAccountDto) {
-    return this.service.create(user, dto);
+    return this.accountsService.create(user, dto);
   }
 
-  @Put(':id')
-  @ApiOperation({ summary: 'Update account info (admin/owner)' })
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update an existing account' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Account updated successfully.',
+  })
   async update(
-     @GetUser() user: User
     @Param('id', ParseIntPipe) id: number,
+    @GetUser() user: User,
     @Body() dto: UpdateAccountDto,
   ) {
-    return this.service.update(id,user, dto);
+    return this.accountsService.update(id, user, dto);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete account (owner only)' })
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    return this.service.delete(id);
+  @ApiOperation({ summary: 'Delete an account' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Account deleted successfully.',
+  })
+  async delete(@Param('id', ParseIntPipe) id: number, @GetUser() user: User) {
+    return this.accountsService.delete(id, user);
   }
 
   @Get()
-  @ApiOperation({
-    summary: 'List accounts with filters, pagination, relations',
+  @ApiOperation({ summary: 'List and filter accounts' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Accounts fetched successfully.',
   })
-  async list(@Query() filter: FilterAccountDto) {
-    return this.service.list(filter);
+  async list(@Query() filters: FilterAccountDto) {
+    return this.accountsService.list(filters);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get account by ID with optional relations' })
-  async getById(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('relations') relations: string,
-  ) {
-    const rels = relations ? relations.split(',') : [];
-    return this.service.getById(id, rels);
+  @ApiOperation({ summary: 'Get a single account by ID' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Account fetched successfully.',
+  })
+  async get(@Param('id', ParseIntPipe) id: number) {
+    return this.accountsService.getById(id);
   }
 
   @Get(':id/balance')
-  @ApiOperation({ summary: 'Get current balance' })
+  @ApiOperation({ summary: 'Get account balance' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Account balance fetched successfully.',
+  })
   async getBalance(@Param('id', ParseIntPipe) id: number) {
-    return this.service.getBalance(account);
+    return this.accountsService.getBalance(id);
   }
 
-  @Put(':id/balance')
-  @ApiOperation({ summary: 'Update balance (add/subtract/set)' })
+  @Patch(':id/balance')
+  @ApiOperation({ summary: 'Update account balance' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Account balance updated successfully.',
+  })
   async updateBalance(
     @Param('id', ParseIntPipe) id: number,
+    @GetUser() user: User,
     @Body() dto: UpdateBalanceDto,
   ) {
-    return this.service.updateBalance(account, dto);
+    return this.accountsService.updateBalance(id, user, dto);
   }
 }

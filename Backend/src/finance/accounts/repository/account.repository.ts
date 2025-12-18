@@ -91,4 +91,18 @@ export class AccountRepository extends Repository<Account> {
 
     return account?.balance ?? '0';
   }
+
+  /* ---------------------------------------------
+   * Ownership Update (Internal Use Only)
+   * ------------------------------------------- */
+  async changeOwner(accountId: number, newOwnerId: number): Promise<Account> {
+    const account = await this.findOne({ where: { id: accountId } });
+
+    if (!account) {
+      throw new Error('Account not found'); // or let service/validator handle this
+    }
+
+    account.ownerId = newOwnerId;
+    return this.save(account);
+  }
 }

@@ -164,4 +164,27 @@ export class AccountUserRoleValidator {
       throw new ForbiddenException('User is not the owner of this account');
     }
   }
+  async ensureOwnerOrAdmin(accountId: number, userId: number) {
+    const role = await this.ensureExists(accountId, userId);
+
+    if (![1, 2].includes(role.roleId)) {
+      throw new ForbiddenException(
+        'Only owner or admin is allowed to perform this action',
+      );
+    }
+
+    return role;
+  }
+
+  async ensureOwnerAdminOrEditor(accountId: number, userId: number) {
+    const role = await this.ensureExists(accountId, userId);
+
+    if (![1, 2, 3].includes(role.roleId)) {
+      throw new ForbiddenException(
+        'Only owner, admin, or editor is allowed to perform this action',
+      );
+    }
+
+    return role;
+  }
 }

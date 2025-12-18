@@ -3,6 +3,7 @@ import { AccountLogRepository } from '../repository/account-log.repository';
 import { AccountLogValidator } from '../validators/account-log.validator';
 import { AccountLogTransformer } from '../transformers/account-log.transformer';
 import { AccountLog } from '../entity/account-log.entity';
+import { EntityManager } from 'typeorm';
 
 // need to add the role validation
 
@@ -13,8 +14,10 @@ export class AccountLogService {
     private readonly validator: AccountLogValidator,
   ) {}
 
-  async create(log: Partial<AccountLog>) {
-    const saved = await this.repository.createLog(log);
+  async create(manager: EntityManager, log: Partial<AccountLog>) {
+    const repo = manager.getRepository(AccountLog);
+    const saved = await repo.save(repo.create(log));
+
     return {
       success: true,
       message: 'Account log created',

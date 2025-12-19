@@ -70,8 +70,8 @@ export class AccountsController {
     status: 200,
     description: 'Accounts fetched successfully.',
   })
-  async list(@Query() filters: FilterAccountDto) {
-    return this.accountsService.list(filters);
+  async list(@GetUser() user: User, @Query() filters: FilterAccountDto) {
+    return this.accountsService.accountListOfCurrentUser(user.id, filters);
   }
 
   @Get(':id')

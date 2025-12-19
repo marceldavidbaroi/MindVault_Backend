@@ -12,9 +12,12 @@ import { AccountsService } from './accounts.service';
 import { EntityManager } from 'typeorm';
 import { AccountUserRole } from '../entity/account-user-role.entity';
 import { AccountLogService } from './account-log.service';
+import { ApiResponse } from 'src/common/types/api-response.type';
 
 @Injectable()
 export class AccountUserRolesService {
+  private readonly SERVICE_SOURCE = 'account_user_role_service';
+
   constructor(
     private readonly repo: AccountUserRoleRepository,
     private readonly rolesValidator: RolesValidator,
@@ -28,15 +31,25 @@ export class AccountUserRolesService {
 
   /** Create owner role */
   async createOwner(manager: EntityManager, accountId: number, user: User) {
-    return manager.getRepository(AccountUserRole).save({
+    const data = await manager.getRepository(AccountUserRole).save({
       accountId,
       userId: user.id,
       roleId: 1, // OWNER
     });
+
+    return {
+      success: true,
+      message: 'Owner role created successfully',
+      data: AccountUserRoleTransformer.toResponse(data),
+    };
   }
 
   /** Assign role with transaction and log */
-  async addRole(currentUserId: number, accountId: number, dto: AssignRoleDto) {
+  async addRole(
+    currentUserId: number,
+    accountId: number,
+    dto: AssignRoleDto,
+  ): Promise<ApiResponse<any>> {
     await this.accountValidator.ensureExists(accountId);
     await this.userValidator.ensureUserExists(dto.userId);
     await this.rolesValidator.ensureExists(dto.roleId);
@@ -47,24 +60,30 @@ export class AccountUserRolesService {
       dto.roleId,
     );
 
-    return this.repo.manager.transaction(async (manager) => {
+    const result = await this.repo.manager.transaction(async (manager) => {
       const newRole = await manager.getRepository(AccountUserRole).save({
         accountId,
         userId: dto.userId,
         roleId: dto.roleId,
       });
 
-      // Log the addition
       await this.accountLogService.create(manager, {
         accountId,
         userId: currentUserId,
         action: 'ADD_ROLE',
         oldValue: null,
         newValue: { userId: dto.userId, roleId: dto.roleId },
+        source: this.SERVICE_SOURCE,
       });
 
       return newRole;
     });
+
+    return {
+      success: true,
+      message: 'Role assigned successfully',
+      data: AccountUserRoleTransformer.toResponse(result),
+    };
   }
 
   /** Update role with transaction and log */
@@ -74,13 +93,11 @@ export class AccountUserRolesService {
     userId: number,
     dto: UpdateRoleDto,
     user: User,
-  ) {
-    // 1️⃣ Validate account, user, role
+  ): Promise<ApiResponse<any>> {
     await this.accountValidator.ensureExists(accountId);
     await this.userValidator.ensureUserExists(userId);
     await this.rolesValidator.ensureExists(dto.roleId);
 
-    // 2️⃣ Get the target role
     const targetRole = await this.accountUserRoleValidator.updateRoleValidator(
       currentUserId,
       accountId,
@@ -88,40 +105,43 @@ export class AccountUserRolesService {
       dto.roleId,
     );
 
-    return this.repo.manager.transaction(async (manager) => {
-      const oldRole = { userId: targetRole.userId, roleId: targetRole.roleId };
+    const result = await this.repo.manager.transaction(async (manager) => {
+      const oldValue = { userId: targetRole.userId, roleId: targetRole.roleId };
 
-      // 3️⃣ Check if role actually changes
-      if (oldRole.roleId === dto.roleId) {
-        // Nothing changed, optionally log attempt
+      if (oldValue.roleId === dto.roleId) {
         await this.accountLogService.create(manager, {
           accountId,
-          userId: user.id,
+          userId: currentUserId,
           action: 'UPDATE_ROLE_ATTEMPT_NO_CHANGE',
-          oldValue: oldRole,
-          newValue: oldRole,
+          oldValue,
+          newValue: oldValue,
+          source: this.SERVICE_SOURCE,
         });
-
-        return targetRole; // Return the original role
+        return targetRole;
       }
 
-      // 4️⃣ Update and save
       targetRole.roleId = dto.roleId;
       const updatedRole = await manager
         .getRepository(AccountUserRole)
         .save(targetRole);
 
-      // 5️⃣ Log the update
       await this.accountLogService.create(manager, {
         accountId,
-        userId: user.id,
+        userId: currentUserId,
         action: 'UPDATE_ROLE',
-        oldValue: oldRole,
+        oldValue,
         newValue: { userId: updatedRole.userId, roleId: updatedRole.roleId },
+        source: this.SERVICE_SOURCE,
       });
 
       return updatedRole;
     });
+
+    return {
+      success: true,
+      message: 'Role updated successfully',
+      data: AccountUserRoleTransformer.toResponse(result),
+    };
   }
 
   /** Remove role with transaction and log */
@@ -130,7 +150,7 @@ export class AccountUserRolesService {
     accountId: number,
     targetUserId: number,
     user: User,
-  ) {
+  ): Promise<ApiResponse<null>> {
     await this.accountValidator.ensureExists(accountId);
     await this.userValidator.ensureUserExists(targetUserId);
 
@@ -140,19 +160,25 @@ export class AccountUserRolesService {
       targetUserId,
     );
 
-    return this.repo.manager.transaction(async (manager) => {
-      const oldRole = { userId: target.userId, roleId: target.roleId };
-
+    await this.repo.manager.transaction(async (manager) => {
+      const oldValue = { userId: target.userId, roleId: target.roleId };
       await manager.getRepository(AccountUserRole).remove(target);
 
       await this.accountLogService.create(manager, {
         accountId,
-        userId: user.id,
+        userId: actorUserId,
         action: 'REMOVE_ROLE',
-        oldValue: oldRole,
+        oldValue,
         newValue: null,
+        source: this.SERVICE_SOURCE,
       });
     });
+
+    return {
+      success: true,
+      message: 'Role removed successfully',
+      data: null,
+    };
   }
 
   /** Transfer ownership with transaction and log */
@@ -161,7 +187,7 @@ export class AccountUserRolesService {
     currentOwnerId: number,
     newOwnerId: number,
     user: User,
-  ) {
+  ): Promise<ApiResponse<null>> {
     const { currentOwner, newOwner } =
       await this.accountUserRoleValidator.validateTransferOwnership(
         accountId,
@@ -169,47 +195,45 @@ export class AccountUserRolesService {
         newOwnerId,
       );
 
-    return this.repo.manager.transaction(async (manager) => {
+    await this.repo.manager.transaction(async (manager) => {
       // Demote current owner
-      const oldCurrentOwnerRole = {
+      const oldCurrentOwnerValue = {
         userId: currentOwner.userId,
         roleId: currentOwner.roleId,
       };
-      currentOwner.roleId = 2; // Demote
+      currentOwner.roleId = 2; // Member/Editor
       await manager.getRepository(AccountUserRole).save(currentOwner);
 
       await this.accountLogService.create(manager, {
         accountId,
         userId: user.id,
         action: 'TRANSFER_OWNERSHIP_DEMOTE',
-        oldValue: oldCurrentOwnerRole,
+        oldValue: oldCurrentOwnerValue,
         newValue: { userId: currentOwner.userId, roleId: currentOwner.roleId },
+        source: this.SERVICE_SOURCE,
       });
 
       if (newOwner) {
-        // Promote new owner
         await this.accountsService.changeOwner(accountId, newOwnerId);
-        const oldNewOwnerRole = {
+        const oldNewOwnerValue = {
           userId: newOwner.userId,
           roleId: newOwner.roleId,
         };
-        newOwner.roleId = 1;
+        newOwner.roleId = 1; // Owner
         await manager.getRepository(AccountUserRole).save(newOwner);
 
         await this.accountLogService.create(manager, {
           accountId,
           userId: user.id,
           action: 'TRANSFER_OWNERSHIP_PROMOTE',
-          oldValue: oldNewOwnerRole,
+          oldValue: oldNewOwnerValue,
           newValue: { userId: newOwner.userId, roleId: newOwner.roleId },
+          source: this.SERVICE_SOURCE,
         });
       } else {
-        // Create owner role if it didn't exist
-        await manager.getRepository(AccountUserRole).save({
-          accountId,
-          userId: newOwnerId,
-          roleId: 1,
-        });
+        await manager
+          .getRepository(AccountUserRole)
+          .save({ accountId, userId: newOwnerId, roleId: 1 });
 
         await this.accountLogService.create(manager, {
           accountId,
@@ -217,9 +241,16 @@ export class AccountUserRolesService {
           action: 'TRANSFER_OWNERSHIP_CREATE',
           oldValue: null,
           newValue: { userId: newOwnerId, roleId: 1 },
+          source: this.SERVICE_SOURCE,
         });
       }
     });
+
+    return {
+      success: true,
+      message: 'Ownership transferred successfully',
+      data: null,
+    };
   }
 
   /** All accounts user has roles */
@@ -229,7 +260,7 @@ export class AccountUserRolesService {
       await this.rolesValidator.ensureExists(roleId);
     }
     const roles = await this.repo.findByUser(userId, roleId);
-    return AccountUserRoleTransformer.toResponseList(roles);
+    return AccountUserRoleTransformer.toAccountIdArray(roles);
   }
 
   /** All roles for account */

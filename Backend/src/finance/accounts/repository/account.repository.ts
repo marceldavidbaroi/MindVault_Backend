@@ -18,7 +18,7 @@ export class AccountRepository extends Repository<Account> {
   /* ---------------------------------------------
    * Filtering + Pagination
    * ------------------------------------------- */
-  async filterAndPaginate(filter: FilterAccountDto) {
+  async filterAndPaginate(filter: FilterAccountDto, accountIds: number[]) {
     const {
       page = 1,
       limit = 20,
@@ -28,20 +28,32 @@ export class AccountRepository extends Repository<Account> {
       relations,
     } = filter;
 
-    let qb: SelectQueryBuilder<Account> = this.createQueryBuilder('account');
+    // Use the repo instance if you followed the previous fix
+    let qb = this.createQueryBuilder('account');
 
+    // 1️⃣ FILTER BY SPECIFIC ACCOUNT NUMBERS / IDS
+    // If no IDs are provided, we should return an empty set or throw to prevent fetching all
+    if (!accountIds || accountIds.length === 0) {
+      return { data: [], total: 0, page, limit };
+    }
+
+    qb.where('account.id IN (:...accountIds)', { accountIds });
+
+    // 2️⃣ DYNAMIC RELATIONS
     if (relations) {
       relations.split(',').forEach((rel) => {
         qb = qb.leftJoinAndSelect(`account.${rel.trim()}`, rel.trim());
       });
     }
 
+    // 3️⃣ SEARCH BY NAME (Optional additional filter)
     if (name) {
       qb.andWhere('account.name ILIKE :name', {
         name: `%${name}%`,
       });
     }
 
+    // 4️⃣ PAGINATION & SORTING
     const [data, total] = await qb
       .orderBy(`account.${sortBy}`, order.toUpperCase() as 'ASC' | 'DESC')
       .skip((page - 1) * limit)

@@ -152,10 +152,14 @@ export class AccountsService {
     };
   }
 
-  async list(filter: FilterAccountDto) {
+  async accountListOfCurrentUser(userId: number, filter: FilterAccountDto) {
     RelationValidator.validate(filter.relations, ACCOUNT_ALLOWED_RELATIONS);
+    const accountIds = await this.accountUserRolesService.getUserAccounts(
+      userId,
+      filter.roleId,
+    );
     const { data, total, page, limit } =
-      await this.accountRepo.filterAndPaginate(filter);
+      await this.accountRepo.filterAndPaginate(filter, accountIds);
     return {
       success: true,
       message: 'Accounts fetched',

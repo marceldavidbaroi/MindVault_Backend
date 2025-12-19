@@ -27,6 +27,15 @@ import { UpdateRoleDto } from '../dto/update-role.dto';
 @Controller('accounts/:accountId/roles')
 export class AccountUserRolesController {
   constructor(private readonly rolesService: AccountUserRolesService) {}
+  @Get()
+  @ApiOperation({ summary: 'Get all roles for this account' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Account roles fetched successfully.',
+  })
+  async getAccountRoles(@Param('accountId', ParseIntPipe) accountId: number) {
+    return this.rolesService.getAccountRoles(accountId);
+  }
 
   @Post()
   @ApiOperation({ summary: 'Assign a role to a user in the account' })
@@ -94,25 +103,5 @@ export class AccountUserRolesController {
       newOwnerId,
       user,
     );
-  }
-
-  @Get('users/:userId')
-  @ApiOperation({ summary: 'Get all accounts a user has roles in' })
-  @SwaggerResponse({
-    status: 200,
-    description: 'User accounts fetched successfully.',
-  })
-  async getUserAccounts(@Param('userId', ParseIntPipe) userId: number) {
-    return this.rolesService.getUserAccounts(userId);
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'Get all roles for this account' })
-  @SwaggerResponse({
-    status: 200,
-    description: 'Account roles fetched successfully.',
-  })
-  async getAccountRoles(@Param('accountId', ParseIntPipe) accountId: number) {
-    return this.rolesService.getAccountRoles(accountId);
   }
 }

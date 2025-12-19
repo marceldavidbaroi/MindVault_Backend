@@ -44,6 +44,11 @@ export class FilterAccountDto {
   @IsString()
   name?: string;
 
+  @ApiProperty({ description: 'Filter by account role', required: false })
+  @IsOptional()
+  @IsString()
+  roleId?: number;
+
   @ApiProperty({
     description: 'Relations to include as comma-separated values',
     required: false,

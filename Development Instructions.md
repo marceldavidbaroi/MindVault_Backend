@@ -19,6 +19,7 @@ It ensures every module is:
 Each module **must** follow this expanded structure:
 
 ```
+
 /src/<module-name>/
 │── controller/
 │     └── <module>.controller.ts
@@ -39,9 +40,11 @@ Each module **must** follow this expanded structure:
 │     ├── query-*.dto.ts
 │     └── shared.dto.ts
 │── data/
-│     └── <module>.data.ts      # default data for seeding
+│     └── <module>.data.ts
 │── seeder/
-│     └── <module>.seeder.ts    # seeder to populate default data
+│     └── <module>.seeder.ts
+│── constants/
+│     └── <module>.constants.ts   # Predefined constants, allowed relations, roles, etc.
 │── <module>.module.ts
 ```
 
@@ -376,6 +379,50 @@ export const defaultData: Partial<<EntityName>>[] = [
    Ensures all relations follow the same pattern, making the codebase predictable and maintainable.
 
 > ⚠️ **Rule:** Always declare both the FK column and the relation for any frequently queried or referenced relationship.
+
+---
+
+---
+
+# **RelationValidator (Common Module)**
+
+**Purpose:**
+Validates that user-requested relations in a query are allowed for the module. Prevents invalid or unsafe joins in queries.
+
+**Behavior:**
+
+- Accepts a **comma-separated string** of relations from the request.
+- Compares them against a **predefined list of allowed relations** (defined in the module’s constants).
+- Throws a **BadRequestException** if any relation is invalid.
+- Returns an **array of valid relations** for use in repository queries.
+
+**Example:**
+
+```ts
+// constants/account.constants.ts
+export const ACCOUNT_ALLOWED_RELATIONS = [
+  "owner",
+  "type",
+  "currency",
+  "transactions",
+];
+
+// service
+import { RelationValidator } from "src/common/validators/relation.validator";
+import { ACCOUNT_ALLOWED_RELATIONS } from "../constants/account.constants";
+
+const relations = RelationValidator.validate(
+  filter.relations,
+  ACCOUNT_ALLOWED_RELATIONS
+);
+relations.forEach((rel) => qb.leftJoinAndSelect(`account.${rel}`, rel));
+```
+
+**Key Points:**
+
+- Centralizes relation validation across modules.
+- Avoids invalid joins that could break queries.
+- Works with **any module** by passing the module-specific allowed relations.
 
 ---
 

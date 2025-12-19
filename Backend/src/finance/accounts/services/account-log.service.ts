@@ -4,8 +4,8 @@ import { AccountLogValidator } from '../validators/account-log.validator';
 import { AccountLogTransformer } from '../transformers/account-log.transformer';
 import { AccountLog } from '../entity/account-log.entity';
 import { EntityManager } from 'typeorm';
-
-// need to add the role validation
+import { User } from 'src/auth/entity/user.entity';
+import { Account } from '../entity/account.entity';
 
 @Injectable()
 export class AccountLogService {
@@ -14,8 +14,38 @@ export class AccountLogService {
     private readonly validator: AccountLogValidator,
   ) {}
 
-  async create(manager: EntityManager, log: Partial<AccountLog>) {
+  /**
+   * Create a log entry
+   * Automatically stores userSnapshot and accountSnapshot if provided
+   */
+  async create(
+    manager: EntityManager,
+    log: Partial<AccountLog> & { user?: User; account?: Account },
+  ) {
     const repo = manager.getRepository(AccountLog);
+
+    // Add snapshots
+    if (log.user) {
+      log.userSnapshot = {
+        id: log.user.id,
+        name: log.user.username,
+        email: log.user.email,
+      };
+      log.userId = log.user.id;
+    }
+
+    if (log.account) {
+      log.accountSnapshot = {
+        id: log.account.id,
+        accountNumber: log.account.accountNumber,
+        ownerId: log.account.ownerId,
+        typeId: log.account.typeId,
+        currencyCode: log.account.currencyCode,
+        balance: log.account.balance,
+      };
+      log.accountId = log.account.id;
+    }
+
     const saved = await repo.save(repo.create(log));
 
     return {
@@ -57,8 +87,11 @@ export class AccountLogService {
 
   async get(id: number, relations: string[] = []) {
     const log = await this.validator.ensureExists(id);
-    if (relations.length)
+
+    if (relations.length) {
       await this.repository.findOne({ where: { id }, relations });
+    }
+
     return {
       success: true,
       message: 'Account log fetched',

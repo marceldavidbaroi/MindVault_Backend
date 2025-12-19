@@ -4,7 +4,7 @@ import {
   forwardRef,
   Inject,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { AccountRepository } from '../repository/account.repository';
 import { Account } from '../entity/account.entity';
 import { CreateAccountDto } from '../dto/create-account.dto';
@@ -12,7 +12,6 @@ import { UpdateAccountDto } from '../dto/update-account.dto';
 import { FilterAccountDto } from '../dto/filter-account.dto';
 import { UpdateBalanceDto, BalanceAction } from '../dto/update-balance.dto';
 import { AccountTransformer } from '../transformers/account.transformer';
-
 import { User } from 'src/auth/entity/user.entity';
 import { AccountValidator } from '../validators/account.validator';
 import { safeAdd, safeSubtract } from 'src/common/utils/decimal-balance';
@@ -28,6 +27,7 @@ import { ACCOUNT_ALLOWED_RELATIONS } from '../constants/account.constants';
 @Injectable()
 export class AccountsService {
   constructor(
+    private readonly dataSource: DataSource,
     private readonly accountRepo: AccountRepository,
     private readonly accountValidator: AccountValidator,
     private readonly currencyValidator: CurrencyValidator,
@@ -42,54 +42,38 @@ export class AccountsService {
     const accountType = await this.accountTypeValidator.ensureExists(
       dto.typeId,
     );
-
     await this.currencyValidator.ensureCurrencyExists(dto.currencyCode);
 
     const prefix = ACCOUNT_SCOPE_PREFIX[accountType.scope];
 
-    const account = await this.accountRepo.manager.transaction(
-      async (manager) => {
-        // 1️⃣ Generate account number
-        const sequence = await this.accountRepo.getNextAccountSequence();
-        const accountNumber = `${prefix}-${sequence}`;
+    const account = await this.dataSource.transaction(async (manager) => {
+      let account = manager.create(Account, {
+        ...dto,
+        ownerId: user.id,
+        balance: dto.initialBalance || '0',
+        accountNumber: '', // temporary
+      });
 
-        // 2️⃣ Create account
-        const account = await manager.save(
-          this.accountRepo.create({
-            ...dto,
-            ownerId: user.id,
-            accountNumber,
-            balance: dto.initialBalance || '0',
-          }),
-        );
+      account = await manager.save(account);
 
-        // 3️⃣ Create owner role
-        await this.accountUserRolesService.createOwner(
-          manager,
-          account.id,
-          user,
-        );
+      account.accountNumber = `${prefix}-${account.id}`;
+      await manager.save(account);
 
-        // 4️⃣ Log account creation
-        await this.accountLogService.create(manager, {
-          accountId: account.id,
-          userId: user.id,
-          action: 'CREATE_ACCOUNT',
-          oldValue: null,
-          newValue: {
-            id: account.id,
-            accountNumber: account.accountNumber,
-            ownerId: account.ownerId,
-            typeId: account.typeId,
-            currencyCode: account.currencyCode,
-            balance: account.balance,
-          },
-          source: 'manual',
-        });
+      // Assign owner role
+      await this.accountUserRolesService.createOwner(manager, account.id, user);
 
-        return account;
-      },
-    );
+      // Log account creation
+      await this.accountLogService.create(manager, {
+        account,
+        user,
+        action: 'CREATE_ACCOUNT',
+        oldValue: null,
+        newValue: null,
+        source: 'account_service',
+      });
+
+      return account;
+    });
 
     return {
       success: true,
@@ -101,49 +85,30 @@ export class AccountsService {
   async update(accountId: number, user: User, dto: UpdateAccountDto) {
     const account = await this.accountValidator.ensureExists(accountId);
 
-    if (dto.currencyCode) {
+    if (dto.currencyCode)
       await this.currencyValidator.ensureCurrencyExists(dto.currencyCode);
-    }
+    if (dto.typeId) await this.accountTypeValidator.ensureExists(dto.typeId);
 
-    if (dto.typeId) {
-      await this.accountTypeValidator.ensureExists(dto.typeId);
-    }
-
-    // Transaction ensures atomicity
     const updatedAccount = await this.accountRepo.manager.transaction(
       async (manager) => {
-        // 1️⃣ Check permissions inside transaction
         await this.accountUserRoleValidator.ensureOwnerOrAdmin(
           accountId,
           user.id,
+          manager,
         );
 
-        // 2️⃣ Snapshot old value for logging
-        const oldValue = {
-          name: account.name,
-          description: account.description,
-          currencyCode: account.currencyCode,
-          typeId: account.typeId,
-          balance: account.balance,
-        };
+        const oldValue = { ...account };
 
-        // 3️⃣ Update account fields
         Object.assign(account, dto);
         const savedAccount = await manager.save(account);
 
-        // 4️⃣ Log the update
+        // Log the update
         await this.accountLogService.create(manager, {
-          accountId: account.id,
-          userId: user.id,
+          account,
+          user,
           action: 'UPDATE_ACCOUNT',
           oldValue,
-          newValue: {
-            name: savedAccount.name,
-            description: savedAccount.description,
-            currencyCode: savedAccount.currencyCode,
-            typeId: savedAccount.typeId,
-            balance: savedAccount.balance,
-          },
+          newValue: null,
           source: 'account_service',
         });
 
@@ -161,39 +126,24 @@ export class AccountsService {
   async delete(accountId: number, user: User) {
     const account = await this.accountValidator.ensureExists(accountId);
 
-    const deletedAccount = await this.accountRepo.manager.transaction(
-      async (manager) => {
-        // 1️⃣ Ensure the user is owner/admin
-        await this.accountUserRoleValidator.ensureOwnerOrAdmin(
-          accountId,
-          user.id,
-        );
+    await this.accountRepo.manager.transaction(async (manager) => {
+      await this.accountUserRoleValidator.ensureOwnerOrAdmin(
+        accountId,
+        user.id,
+      );
 
-        // 2️⃣ Snapshot old values for logging
-        const oldValue = {
-          name: account.name,
-          description: account.description,
-          currencyCode: account.currencyCode,
-          typeId: account.typeId,
-          balance: account.balance,
-        };
-
-        // 3️⃣ Remove account
-        await manager.remove(account);
-
-        // 4️⃣ Log the deletion
-        await this.accountLogService.create(manager, {
-          accountId: account.id,
-          userId: user.id,
-          action: 'REMOVE_ACCOUNT',
-          oldValue,
-          newValue: null,
-          source: 'account_service',
-        });
-
-        return account;
-      },
-    );
+      const oldValue = { ...account };
+      await this.accountLogService.create(manager, {
+        account,
+        user,
+        action: 'REMOVE_ACCOUNT',
+        oldValue,
+        newValue: null,
+        source: 'account_service',
+      });
+      await manager.delete(Account, accountId);
+      // Log the deletion
+    });
 
     return {
       success: true,
@@ -216,7 +166,6 @@ export class AccountsService {
 
   async getById(id: number) {
     const account = await this.accountValidator.ensureExistsWithRelation(id);
-
     return {
       success: true,
       message: 'Account fetched',
@@ -243,10 +192,8 @@ export class AccountsService {
     source?: string,
   ) {
     return this.accountRepo.manager.transaction(async (manager) => {
-      // 1️⃣ Fetch account
       const account = await this.accountValidator.ensureExists(accountId);
 
-      // 2️⃣ Compute new balance
       const oldBalance = account.balance;
       let newBalance: string;
 
@@ -264,21 +211,19 @@ export class AccountsService {
           throw new BadRequestException('Invalid balance action');
       }
 
-      // 3️⃣ Save updated balance
       account.balance = newBalance;
       await manager.save(account);
 
-      // 4️⃣ Create account log
+      // Log balance update
       await this.accountLogService.create(manager, {
-        accountId: account.id,
-        userId: user.id,
+        account,
+        user,
         action: 'UPDATE_ACCOUNT_BALANCE',
         oldValue: { balance: oldBalance },
-        newValue: { balance: newBalance },
+        newValue: null,
         source: source || 'Account Service',
       });
 
-      // 5️⃣ Return response
       return {
         success: true,
         message: 'Balance updated',

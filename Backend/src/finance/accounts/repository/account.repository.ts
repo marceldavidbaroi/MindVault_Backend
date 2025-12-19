@@ -1,10 +1,20 @@
-import { EntityRepository, Repository, SelectQueryBuilder } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import {
+  Repository,
+  DataSource,
+  SelectQueryBuilder,
+  EntityManager,
+} from 'typeorm';
 import { Account } from '../entity/account.entity';
 import { FilterAccountDto } from '../dto/filter-account.dto';
 import { safeAdd, safeSubtract } from 'src/common/utils/decimal-balance';
 
-@EntityRepository(Account)
+@Injectable()
 export class AccountRepository extends Repository<Account> {
+  constructor(private readonly dataSource: DataSource) {
+    super(Account, dataSource.createEntityManager());
+  }
+
   /* ---------------------------------------------
    * Filtering + Pagination
    * ------------------------------------------- */
@@ -51,20 +61,22 @@ export class AccountRepository extends Repository<Account> {
     });
   }
 
-  /* ---------------------------------------------
-   * Account Number Sequence
-   * ------------------------------------------- */
-  async getNextAccountSequence(): Promise<number> {
-    const [{ nextval }] = await this.query(
-      `SELECT nextval('account_number_seq')`,
-    );
-    return Number(nextval);
-  }
+  // /* ---------------------------------------------
+  //  * Account Number Sequence (FIXED)
+  //  * ------------------------------------------- */
+  // async getNextAccountSequence(manager?: EntityManager): Promise<number> {
+  //   const executor = manager ?? this.dataSource;
+
+  //   const [{ nextval }] = await executor.query(
+  //     `SELECT nextval('account_number_seq')`,
+  //   );
+
+  //   return Number(nextval);
+  // }
 
   /* ---------------------------------------------
-   * Balance Operations (Internal Use Only)
+   * Balance Operations
    * ------------------------------------------- */
-
   async addBalance(account: Account, amount: string): Promise<Account> {
     account.balance = safeAdd(account.balance, amount);
     return this.save(account);
@@ -93,13 +105,13 @@ export class AccountRepository extends Repository<Account> {
   }
 
   /* ---------------------------------------------
-   * Ownership Update (Internal Use Only)
+   * Ownership Update
    * ------------------------------------------- */
   async changeOwner(accountId: number, newOwnerId: number): Promise<Account> {
     const account = await this.findOne({ where: { id: accountId } });
 
     if (!account) {
-      throw new Error('Account not found'); // or let service/validator handle this
+      throw new Error('Account not found');
     }
 
     account.ownerId = newOwnerId;

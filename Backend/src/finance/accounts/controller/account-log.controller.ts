@@ -16,7 +16,7 @@ import { AccountLogService } from '../services/account-log.service';
 import { ApiResponse } from 'src/common/types/api-response.type';
 import { AccountLogQueryDto } from '../dto/account-log-query.dto';
 
-@ApiTags('Account Logs')
+@ApiTags('Finance Account Logs')
 @UseGuards(AuthGuard('jwt'))
 @Controller('finance/account-logs')
 export class AccountLogController {

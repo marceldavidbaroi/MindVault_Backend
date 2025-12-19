@@ -22,7 +22,7 @@ import { AccountUserRolesService } from '../services/account-user-roles.service'
 import { AssignRoleDto } from '../dto/assign-role.dto';
 import { UpdateRoleDto } from '../dto/update-role.dto';
 
-@ApiTags('Account User Roles')
+@ApiTags('Finance Account User Roles')
 @UseGuards(AuthGuard('jwt'))
 @Controller('accounts/:accountId/roles')
 export class AccountUserRolesController {

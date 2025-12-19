@@ -16,19 +16,40 @@ export class AccountLog {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Account)
+  // Account relation
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'account_id' })
-  account: Account;
+  account: Account | null;
 
-  @Column({ type: 'int', name: 'account_id' })
-  accountId: number;
+  @Column({ type: 'int', name: 'account_id', nullable: true })
+  accountId: number | null;
 
-  @ManyToOne(() => User, { nullable: true })
+  // User relation
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'user_id' })
-  user: User;
+  user: User | null;
 
   @Column({ type: 'int', name: 'user_id', nullable: true })
   userId: number | null;
+
+  // Snapshot of user at the time of action
+  @Column({ type: 'jsonb', nullable: true })
+  userSnapshot: {
+    id: number;
+    name: string;
+    email?: string;
+  } | null;
+
+  // Snapshot of account at the time of action (optional)
+  @Column({ type: 'jsonb', nullable: true })
+  accountSnapshot: {
+    id: number;
+    accountNumber: string;
+    ownerId: number;
+    typeId: number;
+    currencyCode: string;
+    balance: string;
+  } | null;
 
   @ApiProperty({
     description: 'Type of action: create/update/delete/balance_change',

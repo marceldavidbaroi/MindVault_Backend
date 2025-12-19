@@ -24,7 +24,7 @@ import { UpdateAccountDto } from '../dto/update-account.dto';
 import { FilterAccountDto } from '../dto/filter-account.dto';
 import { UpdateBalanceDto } from '../dto/update-balance.dto';
 
-@ApiTags('Accounts')
+@ApiTags('Finance Accounts')
 @UseGuards(AuthGuard('jwt'))
 @Controller('accounts')
 export class AccountsController {

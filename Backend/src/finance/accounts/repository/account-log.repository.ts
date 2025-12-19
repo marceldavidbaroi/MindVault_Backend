@@ -36,7 +36,6 @@ export class AccountLogRepository extends Repository<AccountLog> {
       });
     }
 
-    query;
     query
       .orderBy('log.created_at', order.toUpperCase() as 'ASC' | 'DESC')
       .skip((page - 1) * limit)

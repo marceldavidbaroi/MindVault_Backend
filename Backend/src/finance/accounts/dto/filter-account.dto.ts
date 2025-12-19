@@ -1,5 +1,6 @@
 import { IsOptional, IsInt, IsString, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export enum SortOrder {
   ASC = 'ASC',
@@ -9,6 +10,7 @@ export enum SortOrder {
 export class FilterAccountDto {
   @ApiProperty({ description: 'Page number', required: false, default: 1 })
   @IsOptional()
+  @Type(() => Number) // transform string to number
   @IsInt()
   page?: number = 1;
 
@@ -18,6 +20,7 @@ export class FilterAccountDto {
     default: 20,
   })
   @IsOptional()
+  @Type(() => Number) // transform string to number
   @IsInt()
   limit?: number = 20;
 

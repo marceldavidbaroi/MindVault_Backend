@@ -23,15 +23,11 @@ export class AccountUserRolesService {
     private readonly accountUserRoleValidator: AccountUserRoleValidator,
     @Inject(forwardRef(() => AccountsService))
     private readonly accountsService: AccountsService,
-    private readonly accountLogService: AccountLogService, // <- make sure you have this injected
+    private readonly accountLogService: AccountLogService,
   ) {}
 
   /** Create owner role */
   async createOwner(manager: EntityManager, accountId: number, user: User) {
-    const account = await this.accountValidator.ensureExists(accountId);
-
-    this.accountUserRoleValidator.ensureOwner(account.ownerId, user.id);
-
     return manager.getRepository(AccountUserRole).save({
       accountId,
       userId: user.id,
@@ -58,6 +54,7 @@ export class AccountUserRolesService {
         roleId: dto.roleId,
       });
 
+      // Log the addition
       await this.accountLogService.create(manager, {
         accountId,
         userId: currentUserId,
@@ -78,10 +75,12 @@ export class AccountUserRolesService {
     dto: UpdateRoleDto,
     user: User,
   ) {
+    // 1️⃣ Validate account, user, role
     await this.accountValidator.ensureExists(accountId);
     await this.userValidator.ensureUserExists(userId);
     await this.rolesValidator.ensureExists(dto.roleId);
 
+    // 2️⃣ Get the target role
     const targetRole = await this.accountUserRoleValidator.updateRoleValidator(
       currentUserId,
       accountId,
@@ -90,19 +89,35 @@ export class AccountUserRolesService {
     );
 
     return this.repo.manager.transaction(async (manager) => {
-      const oldRole = { ...targetRole };
+      const oldRole = { userId: targetRole.userId, roleId: targetRole.roleId };
 
+      // 3️⃣ Check if role actually changes
+      if (oldRole.roleId === dto.roleId) {
+        // Nothing changed, optionally log attempt
+        await this.accountLogService.create(manager, {
+          accountId,
+          userId: user.id,
+          action: 'UPDATE_ROLE_ATTEMPT_NO_CHANGE',
+          oldValue: oldRole,
+          newValue: oldRole,
+        });
+
+        return targetRole; // Return the original role
+      }
+
+      // 4️⃣ Update and save
       targetRole.roleId = dto.roleId;
       const updatedRole = await manager
         .getRepository(AccountUserRole)
         .save(targetRole);
 
+      // 5️⃣ Log the update
       await this.accountLogService.create(manager, {
         accountId,
         userId: user.id,
         action: 'UPDATE_ROLE',
-        oldValue: { userId: oldRole.userId, roleId: oldRole.roleId },
-        newValue: { userId: targetRole.userId, roleId: targetRole.roleId },
+        oldValue: oldRole,
+        newValue: { userId: updatedRole.userId, roleId: updatedRole.roleId },
       });
 
       return updatedRole;
@@ -126,13 +141,15 @@ export class AccountUserRolesService {
     );
 
     return this.repo.manager.transaction(async (manager) => {
+      const oldRole = { userId: target.userId, roleId: target.roleId };
+
       await manager.getRepository(AccountUserRole).remove(target);
 
       await this.accountLogService.create(manager, {
         accountId,
         userId: user.id,
         action: 'REMOVE_ROLE',
-        oldValue: { userId: target.userId, roleId: target.roleId },
+        oldValue: oldRole,
         newValue: null,
       });
     });
@@ -154,24 +171,28 @@ export class AccountUserRolesService {
 
     return this.repo.manager.transaction(async (manager) => {
       // Demote current owner
-      const oldCurrentOwnerRole = { ...currentOwner };
-      currentOwner.roleId = 2;
+      const oldCurrentOwnerRole = {
+        userId: currentOwner.userId,
+        roleId: currentOwner.roleId,
+      };
+      currentOwner.roleId = 2; // Demote
       await manager.getRepository(AccountUserRole).save(currentOwner);
 
       await this.accountLogService.create(manager, {
         accountId,
         userId: user.id,
         action: 'TRANSFER_OWNERSHIP_DEMOTE',
-        oldValue: {
-          userId: oldCurrentOwnerRole.userId,
-          roleId: oldCurrentOwnerRole.roleId,
-        },
+        oldValue: oldCurrentOwnerRole,
         newValue: { userId: currentOwner.userId, roleId: currentOwner.roleId },
       });
 
       if (newOwner) {
+        // Promote new owner
         await this.accountsService.changeOwner(accountId, newOwnerId);
-        const oldNewOwnerRole = { ...newOwner };
+        const oldNewOwnerRole = {
+          userId: newOwner.userId,
+          roleId: newOwner.roleId,
+        };
         newOwner.roleId = 1;
         await manager.getRepository(AccountUserRole).save(newOwner);
 
@@ -179,13 +200,11 @@ export class AccountUserRolesService {
           accountId,
           userId: user.id,
           action: 'TRANSFER_OWNERSHIP_PROMOTE',
-          oldValue: {
-            userId: oldNewOwnerRole.userId,
-            roleId: oldNewOwnerRole.roleId,
-          },
+          oldValue: oldNewOwnerRole,
           newValue: { userId: newOwner.userId, roleId: newOwner.roleId },
         });
       } else {
+        // Create owner role if it didn't exist
         await manager.getRepository(AccountUserRole).save({
           accountId,
           userId: newOwnerId,

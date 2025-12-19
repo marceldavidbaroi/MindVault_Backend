@@ -18,7 +18,8 @@ export class Account {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ApiProperty({ example: 'PER-100000001' })
+  // Remove manual sequence, auto-generate in service using ID + prefix
+  @ApiProperty({ example: 'PER-1' })
   @Column({
     name: 'account_number',
     type: 'varchar',

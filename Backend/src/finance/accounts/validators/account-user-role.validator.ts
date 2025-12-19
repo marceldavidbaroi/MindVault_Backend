@@ -4,126 +4,126 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AccountUserRoleRepository } from '../repository/account-user-role.repository';
+import { AccountUserRole } from '../entity/account-user-role.entity';
+import { EntityManager, Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class AccountUserRoleValidator {
-  constructor(private readonly repo: AccountUserRoleRepository) {}
+  constructor(
+    @InjectRepository(AccountUserRole)
+    private readonly repo: Repository<AccountUserRole>,
+  ) {}
 
-  async ensureExists(accountId: number, userId: number) {
-    const role = await this.repo.findOneByAccountAndUser(accountId, userId);
-    if (!role) {
-      throw new NotFoundException('Role not found for this user');
-    }
+  // Helper to get repository (transaction-safe)
+  private getRepo(manager?: EntityManager): Repository<AccountUserRole> {
+    return manager ? manager.getRepository(AccountUserRole) : this.repo;
+  }
+
+  // ✅ Ensure role exists
+  async ensureExists(
+    accountId: number,
+    userId: number,
+    manager?: EntityManager,
+  ) {
+    const repo = this.getRepo(manager);
+    const role = await repo.findOne({ where: { accountId, userId } });
+    if (!role) throw new NotFoundException('Role not found for this user');
     return role;
   }
 
+  // ✅ Check role hierarchy
   ensureCanManage(actorRoleId: number, targetRoleId: number) {
     if (actorRoleId > targetRoleId) {
       throw new ForbiddenException('Insufficient permission');
     }
   }
 
+  // ✅ Assign role validator
   async assignRoleValidator(
     actorRoleId: number,
     accountId: number,
     targetUserId: number,
     roleId: number,
+    manager?: EntityManager,
   ): Promise<void> {
-    // Owner must be assigned via ownership transfer
-    if (roleId === 1) {
+    if (roleId === 1)
       throw new BadRequestException('Owner must be assigned separately');
-    }
-
-    // Only Owner or Admin can assign roles
-    if (![1, 2].includes(actorRoleId)) {
+    if (![1, 2].includes(actorRoleId))
       throw new ForbiddenException('Insufficient permission');
-    }
-
-    // Admin cannot assign Owner or Admin
-    if (actorRoleId === 2 && roleId < 3) {
+    if (actorRoleId === 2 && roleId < 3)
       throw new ForbiddenException('Admin cannot assign Owner or Admin role');
-    }
 
-    // Prevent duplicate role assignment
-    const existing = await this.repo.findOneByAccountAndUser(
-      accountId,
-      targetUserId,
-    );
-
-    if (existing) {
+    const repo = this.getRepo(manager);
+    const existing = await repo.findOne({
+      where: { accountId, userId: targetUserId },
+    });
+    if (existing)
       throw new BadRequestException('User already has a role in this account');
-    }
   }
 
+  // ✅ Update role validator
   async updateRoleValidator(
     actorRoleId: number,
     accountId: number,
     targetUserId: number,
     newRoleId: number,
+    manager?: EntityManager,
   ) {
-    // Only Owner or Admin can update roles
-    if (![1, 2].includes(actorRoleId)) {
+    if (![1, 2].includes(actorRoleId))
       throw new ForbiddenException(
         'You do not have permission to update roles',
       );
-    }
 
-    // Cannot assign Owner via this method
-    if (newRoleId === 1) {
+    if (newRoleId === 1)
       throw new BadRequestException('Use transfer ownership to assign Owner');
-    }
 
-    const targetRole = await this.ensureExists(accountId, targetUserId);
+    // Get the target role
+    const targetRole = await this.ensureExists(
+      accountId,
+      targetUserId,
+      manager,
+    );
 
-    // Ensure actor cannot manage higher hierarchy
+    // Check hierarchy
     this.ensureCanManage(actorRoleId, targetRole.roleId);
 
-    // Admin (2) cannot assign Owner or Admin
-    if (actorRoleId === 2 && newRoleId < 3) {
+    if (actorRoleId === 2 && newRoleId < 3)
       throw new ForbiddenException('Admin cannot assign Owner or Admin role');
-    }
 
     return targetRole;
   }
 
+  // ✅ Validate removing a role
   async validateRemoveRole(
     accountId: number,
     actorUserId: number,
     targetUserId: number,
+    manager?: EntityManager,
   ) {
-    const actorRole = await this.ensureExists(accountId, actorUserId);
-    const targetRole = await this.ensureExists(accountId, targetUserId);
+    const actorRole = await this.ensureExists(accountId, actorUserId, manager);
+    const targetRole = await this.ensureExists(
+      accountId,
+      targetUserId,
+      manager,
+    );
 
     const actorRoleId = actorRole.roleId;
     const targetRoleId = targetRole.roleId;
 
-    // Owner cannot delete themselves
-    if (actorRoleId === 1 && actorUserId === targetUserId) {
+    if (actorRoleId === 1 && actorUserId === targetUserId)
       throw new BadRequestException('Owner cannot delete their own role');
-    }
+    if (actorRoleId === 1) return targetRole;
 
-    // Owner can delete anyone else
-    if (actorRoleId === 1) {
-      return targetRole;
-    }
-
-    // Admin rules
     if (actorRoleId === 2) {
-      // Admin can delete self
       if (actorUserId === targetUserId) return targetRole;
-
-      // Admin can delete editor or viewer only
       if (targetRoleId > 2) return targetRole;
-
       throw new ForbiddenException(
         'Admin can only delete themselves or editor/viewer roles',
       );
     }
 
-    // Editor or Viewer rules
     if (actorRoleId > 2) {
-      // Can only delete self
       if (actorUserId === targetUserId) return targetRole;
       throw new ForbiddenException(
         'Editors and viewers can only remove their own roles',
@@ -133,58 +133,58 @@ export class AccountUserRoleValidator {
     throw new ForbiddenException('Insufficient permissions');
   }
 
+  // ✅ Transfer ownership validator
   async validateTransferOwnership(
     accountId: number,
     currentOwnerId: number,
     newOwnerId: number,
+    manager?: EntityManager,
   ) {
-    // Ensure current owner exists
-    const currentOwner = await this.ensureExists(accountId, currentOwnerId);
-    if (currentOwner.roleId !== 1) {
-      throw new ForbiddenException('Only current owner can transfer ownership');
-    }
-
-    // Prevent transferring ownership to self
-    if (currentOwnerId === newOwnerId) {
-      throw new BadRequestException('Cannot transfer ownership to self');
-    }
-
-    // Check if new owner exists in account
-    const newOwner = await this.repo.findOneByAccountAndUser(
+    const currentOwner = await this.ensureExists(
       accountId,
-      newOwnerId,
+      currentOwnerId,
+      manager,
     );
+    if (currentOwner.roleId !== 1)
+      throw new ForbiddenException('Only current owner can transfer ownership');
+    if (currentOwnerId === newOwnerId)
+      throw new BadRequestException('Cannot transfer ownership to self');
 
-    // Return both entities for the service to use
+    const repo = this.getRepo(manager);
+    const newOwner = await repo.findOne({
+      where: { accountId, userId: newOwnerId },
+    });
+
     return { currentOwner, newOwner };
   }
 
+  // ✅ Ownership check
   ensureOwner(ownerId: number, userId: number) {
-    if (ownerId !== userId) {
+    if (ownerId !== userId)
       throw new ForbiddenException('User is not the owner of this account');
-    }
   }
-  async ensureOwnerOrAdmin(accountId: number, userId: number) {
-    const role = await this.ensureExists(accountId, userId);
 
-    if (![1, 2].includes(role.roleId)) {
-      throw new ForbiddenException(
-        'Only owner or admin is allowed to perform this action',
-      );
-    }
-
+  // ✅ Owner or admin
+  async ensureOwnerOrAdmin(
+    accountId: number,
+    userId: number,
+    manager?: EntityManager,
+  ) {
+    const role = await this.ensureExists(accountId, userId, manager);
+    if (![1, 2].includes(role.roleId))
+      throw new ForbiddenException('Only owner or admin allowed');
     return role;
   }
 
-  async ensureOwnerAdminOrEditor(accountId: number, userId: number) {
-    const role = await this.ensureExists(accountId, userId);
-
-    if (![1, 2, 3].includes(role.roleId)) {
-      throw new ForbiddenException(
-        'Only owner, admin, or editor is allowed to perform this action',
-      );
-    }
-
+  // ✅ Owner, admin, or editor
+  async ensureOwnerAdminOrEditor(
+    accountId: number,
+    userId: number,
+    manager?: EntityManager,
+  ) {
+    const role = await this.ensureExists(accountId, userId, manager);
+    if (![1, 2, 3].includes(role.roleId))
+      throw new ForbiddenException('Only owner, admin, or editor allowed');
     return role;
   }
 }

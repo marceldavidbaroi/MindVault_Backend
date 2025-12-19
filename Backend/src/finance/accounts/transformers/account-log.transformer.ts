@@ -12,12 +12,32 @@ export class AccountLogTransformer {
       transactionId: log.transactionId,
       source: log.source,
       createdAt: log.createdAt,
+
+      // Snapshots
+      accountSnapshot: log.accountSnapshot ?? null,
+      userSnapshot: log.userSnapshot ?? null,
+
+      // Relations (optional)
       account: log.account
-        ? { id: log.account.id, name: log.account.name }
-        : undefined,
+        ? {
+            id: log.account.id,
+            name: log.account.name,
+            accountNumber: log.account.accountNumber,
+            ownerId: log.account.ownerId,
+            typeId: log.account.typeId,
+            currencyCode: log.account.currencyCode,
+            balance: log.account.balance,
+          }
+        : null,
+
       user: log.user
-        ? { id: log.user.id, username: log.user.username }
-        : undefined,
+        ? {
+            id: log.user.id,
+            username: log.user.username,
+            name: log.user.username,
+            email: log.user.email,
+          }
+        : null,
     };
   }
 

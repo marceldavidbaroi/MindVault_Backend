@@ -19,30 +19,24 @@ export class AccountLogRepository extends Repository<AccountLog> {
     limit: number,
     actions?: string[],
     order: 'asc' | 'desc' = 'desc',
-    relations: string[] = [],
   ) {
     const query = this.createQueryBuilder('log').where(
       'log.account_id = :accountId',
       { accountId },
     );
 
-    if (actions && actions.length) {
+    // Filter by actions
+    if (actions?.length) {
       query.andWhere('log.action IN (:...actions)', { actions });
     }
 
-    if (relations.length) {
-      relations.forEach((relation) => {
-        query.leftJoinAndSelect(`log.${relation}`, relation);
-      });
-    }
-
+    // Only order by created_at
     query
       .orderBy('log.created_at', order.toUpperCase() as 'ASC' | 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
     const [data, total] = await query.getManyAndCount();
-
     return { data, total };
   }
 }

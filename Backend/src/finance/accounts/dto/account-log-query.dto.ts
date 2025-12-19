@@ -1,4 +1,3 @@
-// src/finance/accounts/dto/account-log-query.dto.ts
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsInt, Min, IsString, IsIn } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -28,7 +27,7 @@ export class AccountLogQueryDto {
   actions?: string;
 
   @ApiPropertyOptional({
-    description: 'Sort order',
+    description: 'Sort order (only by created_at)',
     example: 'desc',
     enum: ['asc', 'desc'],
   })
@@ -36,11 +35,8 @@ export class AccountLogQueryDto {
   @IsIn(['asc', 'desc'])
   order?: 'asc' | 'desc' = 'desc';
 
-  @ApiPropertyOptional({
-    description: 'Relations to fetch (comma-separated)',
-    example: 'user,account',
-  })
-  @IsOptional()
-  @IsString()
-  relations?: string;
+  // Helper to convert comma-separated actions to array
+  getActionsArray(): string[] {
+    return this.actions?.split(',').map((a) => a.trim()) || [];
+  }
 }

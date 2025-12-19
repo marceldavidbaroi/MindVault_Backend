@@ -36,7 +36,6 @@ export class AccountLogController {
     @Param('accountId', ParseIntPipe) accountId: number,
     @Query() query: AccountLogQueryDto,
   ) {
-    const relations = query.relations ? query.relations.split(',') : [];
     const actions = query.actions ? query.actions.split(',') : undefined;
 
     return this.logService.listByAccount(
@@ -45,7 +44,6 @@ export class AccountLogController {
       query.limit,
       actions,
       query.order,
-      relations,
     );
   }
 
@@ -57,9 +55,7 @@ export class AccountLogController {
   })
   async getLog(
     @Param('id', ParseIntPipe) id: number,
-    @Query('relations') relations?: string,
   ): Promise<ApiResponse<any>> {
-    const relationArray = relations ? relations.split(',') : [];
-    return this.logService.get(id, relationArray);
+    return this.logService.get(id);
   }
 }

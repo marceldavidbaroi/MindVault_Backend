@@ -74,7 +74,6 @@ export class AccountLogService {
       limit,
       actionsArray,
       order,
-      relArray,
     );
 
     return {

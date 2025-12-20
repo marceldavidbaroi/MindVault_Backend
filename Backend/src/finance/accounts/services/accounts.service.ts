@@ -4,7 +4,7 @@ import {
   forwardRef,
   Inject,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AccountRepository } from '../repository/account.repository';
 import { Account } from '../entity/account.entity';
 import { CreateAccountDto } from '../dto/create-account.dto';
@@ -188,52 +188,50 @@ export class AccountsService {
       },
     };
   }
-
   async updateBalance(
+    manager: EntityManager, // Pass the transactional manager
     accountId: number,
     user: User,
     dto: UpdateBalanceDto,
     source?: string,
   ) {
-    return this.accountRepo.manager.transaction(async (manager) => {
-      const account = await this.accountValidator.ensureExists(accountId);
+    // Ensure the account exists
+    const account = await this.accountValidator.ensureExists(
+      accountId,
+      manager,
+    );
 
-      const oldBalance = account.balance;
-      let newBalance: string;
+    const oldBalance = account.balance;
+    let newBalance: string;
 
-      switch (dto.action) {
-        case BalanceAction.ADD:
-          newBalance = safeAdd(account.balance, dto.amount);
-          break;
-        case BalanceAction.SUBTRACT:
-          newBalance = safeSubtract(account.balance, dto.amount);
-          break;
-        case BalanceAction.SET:
-          newBalance = dto.amount;
-          break;
-        default:
-          throw new BadRequestException('Invalid balance action');
-      }
+    switch (dto.action) {
+      case BalanceAction.ADD:
+        newBalance = safeAdd(account.balance, dto.amount);
+        break;
+      case BalanceAction.SUBTRACT:
+        newBalance = safeSubtract(account.balance, dto.amount);
+        break;
+      case BalanceAction.SET:
+        newBalance = dto.amount;
+        break;
+      default:
+        throw new BadRequestException('Invalid balance action');
+    }
 
-      account.balance = newBalance;
-      await manager.save(account);
+    account.balance = newBalance;
+    await manager.save(account);
 
-      // Log balance update
-      await this.accountLogService.create(manager, {
-        account,
-        user,
-        action: 'UPDATE_ACCOUNT_BALANCE',
-        oldValue: { balance: oldBalance },
-        newValue: null,
-        source: source || 'Account Service',
-      });
-
-      return {
-        success: true,
-        message: 'Balance updated',
-        data: { balance: newBalance },
-      };
+    // Log balance update using the same transactional manager
+    await this.accountLogService.create(manager, {
+      account,
+      user,
+      action: 'UPDATE_ACCOUNT_BALANCE',
+      oldValue: { balance: oldBalance },
+      newValue: { balance: newBalance },
+      source: source || 'Account Service',
     });
+
+    return newBalance;
   }
 
   async changeOwner(accountId: number, newOwnerId: number) {
